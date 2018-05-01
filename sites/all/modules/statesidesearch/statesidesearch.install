@@ -1,0 +1,173 @@
+<?php
+// $ID$
+
+
+/**
+ * Implementation of hook_schema()
+ */
+function statesidesearch_schema() {
+    $schema['statesidesearch_userdata'] = array(
+    'description' => t('Stores User Status info'),
+    'fields' => array(
+      'county' => array(
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'description' => t('County'),
+        'length' => '30',
+        ),
+      'low_income' => array(
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'description' => t('Low Income'),
+        'length' => '3',
+        ),
+      'over60' => array(
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'description' => t('Over 60'),
+        'length' => '3',
+        ),
+      'sid' => array(
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'description' => t('SessionID'),
+        'length' => '50',
+        ),
+      'created' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => t('Time Created'),
+        'length' => '11',
+        ),
+      'id' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => t('UniqueID for this record'),
+        ),
+      ),
+    'primary key' => array('id'),
+    'indexes' => array(
+      'county' => array('county'),
+      'low_income' => array('low_income'),
+      'over60' => array('over60'),
+      'sid' => array('sid'),
+    ),
+  );
+
+    $schema['statesidesearch_data'] = array(
+    'fields' => array(
+      'qid' => array(
+        'type' => 'serial',
+        'disp-width' => 11,
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+     ),
+      'term' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'counter' => array(
+        'type' => 'int',
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      ),
+      'orgs' => array(
+        'type' => 'int',
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      ),
+      'rel_orgs' => array(
+        'type' => 'int',
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      ),
+      'related' => array(
+        'type' => 'int',
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      ),
+      'returns' => array(
+        'type' => 'int',
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      ),
+      'promotions' => array(
+        'type' => 'int',
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      )
+    ),
+    'indexes' => array(
+      'term' => array('term'),
+      'returns' => array('returns'),
+      'orgs' => array('orgs'),
+      'rel_orgs' => array('rel_orgs'),
+      'related' => array('related'),
+      'promotions' => array('promotions'),
+    ),
+    'primary key' => array('qid')
+  );
+
+  $schema['statesidesearch'] = array(
+    'description' => t('Stores search terms and dates'),
+    'fields' => array(
+      'qid' => array(
+        'type' => 'serial',
+        'disp-width' => 11,
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+     ),
+      'term' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'date' => array(
+        'description' => 'The Unix timestamp when the record was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0),
+    ),
+    'primary key' => array('qid'),
+    'indexes' => array(
+      'term' => array('term'),
+      'date' => array('date'),
+      ),
+    );
+    
+      return $schema;
+}
+/**
+ * Implementation of hook_install()
+ */
+
+/**
+* Add newcol field to {mytable1} table.
+*/
+function statesidesearch_update_001() {
+  $spec = array(
+    'type' => 'int',
+    'description' => "Results from Tags",
+    'disp-width' => 11,
+    'not null' => FALSE,
+    'default' => 0,
+    'unsigned' => TRUE,
+  );
+  db_add_field( 'statesidesearch_data', 'tagged', $spec);
+}

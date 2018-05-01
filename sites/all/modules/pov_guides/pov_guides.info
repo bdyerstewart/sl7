@@ -1,0 +1,9 @@
+name = "Poverty Guidelines Insert (wysiwyg)"
+description = "WYSIWYG widget to allow building poverty guideline displays"
+core = 7.x
+package = Other
+dependencies[] = wysiwyg
+files[] = plugins/pov_guides_wysiwyg.inc
+files[] = plugins/pov_guides_wysiwyg/pov_guides_wysiwyg.js
+stylesheets[all][] = pov_guides.css
+project = "pov_guides_wysiwyg"

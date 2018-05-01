@@ -1,0 +1,158 @@
+<?php
+/**
+ * @file
+ * This is an easy subscription module
+ */
+
+
+/**
+ * DB management.
+ */
+ 
+function easy_subscription_form($form, &$form_state) {
+  $form = array();
+
+  $form['email'] = array(
+    '#type'  => 'textfield',
+    '#title' => t('email'),
+    '#size'  => 20,
+    '#required' => TRUE,
+    '#validate' => array('filter_form_validate' => array('email_validation')),
+  );
+  $form['unsuscribe'] = array(
+    '#type'  => 'checkbox',
+    '#title' => t('unsuscribe'),
+  );
+  $form['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => t('Add'),
+  );
+
+  return $form;
+}
+
+/**
+ * Submit handler for 'add email' form.
+ */
+function easy_subscription_form_submit($form, &$form_state) {
+  if ($validation = valid_email_address($form_state['values']['email']) ){
+		global $_domain;
+		$domain_id = 0;
+		if ( $_domain['domain_id'] ){
+			$domain_id = $_domain['domain_id'];
+		}
+		// Process the submitted $entry.
+		$entry = array(
+		  'email'=> $form_state['values']['email'],
+		  'did' => $domain_id ,
+		);
+		if ( $form_state['values']['unsuscribe'] == 0 ){
+			$act = "create";
+			$msg = t("Suscribbed for address ").$form_state['values']['email'] ;
+		}
+		else{
+			$act = "delete";
+			$msg = t("Unsuscribbed for address ").$form_state['values']['email'] ;
+		}
+		$result = es_process(array ('entry' =>$entry, 'act' => $act, 'msg' => $msg) );
+  }
+  else{
+ 		$result = 'Invalid address';
+  }
+  drupal_set_message($result);
+}
+
+function es_process($parms) {
+  $entry = $parms['entry'];
+  $msg = $parms['msg'];
+  try {
+		if ($parms['act'] == 'create'){
+		  $return_value = db_insert('easy_subscription_people')
+		                  ->fields($parms['entry'])
+		                  ->execute();
+    }
+    else{
+    	$return_value = db_delete('easy_subscription_people')
+											->condition('email', $entry['email'])
+											->condition('did', $entry['did'])
+											->execute();
+    }
+  }
+  catch (Exception $e) {
+    drupal_set_message(t('db_update failed. Message = %message, query= %query',
+      array('%message' => $e->getMessage(), '%query' => $e->query_string)), 'error');
+    $msg = null;
+  }
+  return $msg;
+}
+	
+/* Block*/
+function easy_subscription_block_info(){
+	$blocks['subscription_form'] = array(
+		'info' => t('Easy Subscription Block'),
+		'status'  => TRUE,
+		'region' => 'sidebar_first',
+	);
+	return $blocks;
+}
+
+
+
+
+function easy_subscription_block_view($delta=''){
+	switch ($delta){
+		case 'subscription_form':
+			$block['subject'] = t('Subscription');
+			$block['content'] = drupal_get_form('easy_subscription_form');
+      break;
+	}
+	return $block;
+}
+
+/*Action when node insert*/
+
+function easy_subscription_node_insert($node){
+	send_subscription_mail($node,"New content");
+}
+
+function easy_subscription_node_update($node){
+	send_subscription_mail($node, "Updated content");
+}
+
+function send_subscription_mail($node, $subscripton_content_type){
+  if ( $subscripton_content_type == 'New content' ){
+  	$subject_msg = t('New content from ');
+  }
+  else{
+  	$subject_msg = t('Updated content from ');
+  }
+  global $_domain;
+  $domain_id = 0;
+	if ( $_domain['domain_id'] ){
+			$domain_id = $_domain['domain_id'];
+	}
+  $result = db_query("SELECT email FROM {easy_subscription_people} WHERE did = :domain_id", array(  ':domain_id' => $domain_id,));
+	$Bcc = '';
+	foreach ($result as $record) {
+	  	$Bcc .= $record->email.',';
+	  	watchdog('Easy subscription','Send mail to: '.$record->email,null, WATCHDOG_NOTICE);
+	}
+  $module = 'easy_subscription';
+  $key = 'send_mail';
+  $email = variable_get('site_mail','');
+  $language = language_default();
+  $params = array();
+  $from =  variable_get('site_name','') .'<'.variable_get('site_mail','').'>' ;
+  $send = FALSE;
+  $subject = $subject_msg.variable_get('site_name','').' - '. $node->title;
+  $message = drupal_mail($module, $key, $email, $language, $params, $from, $send);
+  $message['headers']['Bcc'] = $Bcc;
+  $message['subject'] = $subject;
+  $message['body'] = array();
+  $message['body'][] =  $node->body['und'][0]['value'];
+  $system = drupal_mail_system($module, $key);
+  $message = $system->format($message);
+  $message['result'] = $system->mail($message);
+}
+
+

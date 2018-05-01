@@ -1,0 +1,17 @@
+name = User Notes
+description = User notes for the Online Classroom Module
+core = 7.x
+package = Online Classroom
+version = 7.x-1.0
+project = user_notes
+dependencies[] = features
+dependencies[] = text
+dependencies[] = views
+features[ctools][] = views:views_default:3.0
+features[features_api][] = api:1
+features[field_base][] = body
+features[field_instance][] = node-classroom_note-body
+features[node][] = classroom_note
+features[views_view][] = notes
+features_exclude[dependencies][ctools] = ctools
+features_exclude[field][node-classroom_note-body] = node-classroom_note-body

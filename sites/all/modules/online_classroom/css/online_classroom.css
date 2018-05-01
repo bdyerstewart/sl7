@@ -1,0 +1,119 @@
+.view-classroom-steps .views-field-ops {
+  float:left;
+  padding-right:5px;
+}
+
+.view-classroom-steps .views-row {
+  clear:both;
+  overflow:hidden;
+  margin-bottom:5px;
+}
+
+.view-classroom-steps .views-row-last {
+  margin-bottom:0;
+}
+
+.view-classroom-steps .style-1 a {
+  font-weight:bold;
+}
+
+.view-classroom-steps .style-2 a {
+  margin-left:10px;
+}
+
+.view-classroom-steps .style-3 a {
+  font-weight:bold;
+  margin-left:10px;
+}
+
+.view-classroom-steps .flag-completed {
+  display: block;
+  border: 1px solid #ddd;
+  border-bottom-color: #ccc;
+  -moz-border-radius: 2px;
+  -webkit-border-radius: 2px;
+  -o-border-radius: 2px;
+  -ms-border-radius: 2px;
+  -khtml-border-radius: 2px;
+  border-radius: 2px;
+  padding: 4px 1px;
+  background:#fff;
+}
+
+.view-classroom-steps .flag-completed .flag {
+  overflow: hidden;
+  text-indent: 200%;
+  white-space: nowrap;
+  width: 22px;
+  height: 17px;
+  padding: 0 2px;
+  background: url(tick.png) no-repeat center top;
+  background: rgba(0, 0, 0, 0) url(tick.svg) no-repeat center top;
+  float: left;
+}
+
+.view-classroom-steps .flag-completed .flag:hover {
+  background-position: center -17px;
+}
+
+.view-classroom-steps .flag-completed .unflag-action {
+  background-position: center -17px;
+}
+
+.view-classroom-steps .flag-wrapper {
+  overflow: hidden;
+}
+
+.view-classroom-steps .flag-throbber {
+  display: none;
+}
+
+.classroom-navigation-wrapper {
+  overflow:hidden;
+}
+
+.classroom-navigation-wrapper .classroom-previous-navigation {
+  float:left;
+}
+
+.classroom-navigation-wrapper .classroom-next-navigation {
+  float:right;
+}
+.page-classroom fieldset.collapsed legend {
+  border-radius: 4px;
+}
+.page-classroom fieldset{
+  border-width: 1px;
+}
+.page-classroom fieldset legend {
+  -moz-border-bottom-colors: none;
+  -moz-border-left-colors: none;
+  -moz-border-right-colors: none;
+  -moz-border-top-colors: none;
+  background: #dbdbdb none repeat scroll 0 0;
+  border-color: #ccc #ccc -moz-use-text-color;
+  border-image: none;
+  border-style: solid solid none;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  border-width: 1px 1px medium;
+  display: block;
+  height: 2em;
+  left: -1px;
+  line-height: 2;
+  padding: 0;
+  position: absolute;
+  text-indent: 10px;
+  text-shadow: 0 1px 0 #fff;
+  top: -12px;
+  width: 100%;
+}
+.page-classroom fieldset a{
+  text-decoration: none;
+}
+.page-classroom fieldset a:hover{
+  color: darkred;
+}
+.page-classroom fieldset a:focus{
+  outline: none;
+}

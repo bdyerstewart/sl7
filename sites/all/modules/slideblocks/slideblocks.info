@@ -1,0 +1,12 @@
+;$Id$
+name = Mobile Slide Blocks
+description = Takes specific blocks and makes them slide in content on screen size change
+package = Other
+core = 7.x
+
+scripts[] = jquery.touchSwipe.js
+scripts[] = slideblocks.js
+stylesheets[all][] = slideblocks.css
+files[] = slideblocks.module
+files[] = slideblocks.admin.inc
+

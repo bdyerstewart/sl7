@@ -1,0 +1,533 @@
+<?php
+
+/**
+ * @file
+ * Defines an US county field type.
+ *
+ * @author Jim Berry ("solotandem", http://drupal.org/user/240748)
+ */
+
+/**
+ * Implements hook_help().
+ */
+function county_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#county':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('The County module defines a field for storing the US county associated with an US state. See the <a href="@field-help">Field module help page</a> for more information about fields.', array('@field-help' => url('admin/help/field'))) . '</p>';
+      return $output;
+  }
+}
+
+/**
+ * Implements hook_field_info().
+ */
+function county_field_info() {
+  return array(
+    'county' => array(
+      'label' => t('County'),
+      'description' => t('This field stores an US county FIPS code as varchar text in the database.'),
+      'settings' => array(),
+      'instance_settings' => array('admin_area_field' => ''),
+      'default_widget' => 'county_select',
+      'default_formatter' => 'county_default',
+      'property_type' => 'text',
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_instance_settings_form().
+ */
+function county_field_instance_settings_form($field, $instance) {
+  $settings = $instance['settings'];
+  // @todo Add this to replace the field vsrsion of has_data();
+//   $has_data = field_instance_has_data($instance);
+
+  $bundle_instances = field_info_instances($instance['entity_type'], $instance['bundle']);
+  unset($bundle_instances[$instance['field_name']]);
+
+  $supported_field_types = array('text', 'list_text');
+  $potential_fields = array();
+
+  // Get a list of fields on this entity that are of a supported type.
+  foreach ($bundle_instances as $bundle_instance) {
+    $potential_field = field_info_field($bundle_instance['field_name']);
+    if (in_array($potential_field['type'], $supported_field_types)) {
+      $potential_fields[$bundle_instance['field_name']] = $bundle_instance['label'];
+    }
+  }
+
+  // @todo Add a hidden country field so this is ready to handle all tuples of
+  // (country, admin_area, sub admin_area).
+  $form['admin_area_field'] = array(
+    '#type' => 'select',
+    '#title' => t('State field'),
+    '#default_value' => isset($settings['admin_area_field']) ? $settings['admin_area_field']: '',
+    '#options' => $potential_fields,
+    '#description' => t('Select the state field used to filter the county list.'),
+    '#required' => TRUE,
+  );
+  // @todo Add a validation handler and require cardinality = 1 on this field
+  // and the admin_area_field?
+
+  return $form;
+}
+
+/**
+ * Implements hook_field_validate().
+ *
+ * Possible error codes:
+ * - 'county_illegal_value': The value is not a valid US county FIPS code.
+ */
+function county_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+  foreach ($items as $delta => $item) {
+    if (!empty($item['value']) && $item['value'] != '_none') {
+      // Alright to run this query as $delta should always equal one.
+      if (county_display_value($item['value']) == 'None') {
+        $errors[$field['field_name']][$langcode][$delta][] = array(
+          'error' => 'county_illegal_value',
+          'message' => t('%name: illegal value.', array('%name' => $instance['label'])),
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function county_field_is_empty($item, $field) {
+  if (empty($item['value']) || (string) $item['value'] == '_none') {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function county_field_formatter_info() {
+  return array(
+    'county_default' => array(
+      'label' => t('Default'),
+      'description' => t('County name'),
+      'field types' => array('county'),
+    ),
+    'county_short' => array(
+      'label' => t('Short'),
+      'description' => t('County name without suffix'),
+      'field types' => array('county'),
+    ),
+    'county_key' => array(
+      'label' => t('Key'),
+      'description' => t('County FIPS code'),
+      'field types' => array('county'),
+    ),
+    'county_all' => array(
+      'label' => t('All'),
+      'description' => t('County name with FIPS code in parentheses'),
+      'field types' => array('county'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function county_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  switch ($display['type']) {
+    case 'county_default':
+      foreach ($items as $delta => $item) {
+        $output = field_filter_xss(county_display_value($item['value']));
+        $element[$delta] = array('#markup' => $output);
+      }
+      break;
+
+    case 'county_short':
+      // @todo Sort the suffix strings: county is most likely. Use a replace
+      // callback and return if a suffix is found.
+      $suffixes = ['County', 'Parish', 'City and Borough', 'Borough', 'Census Area', 'city', 'District', 'Municipality', 'Municipio', 'Island'];
+      foreach ($items as $delta => $item) {
+        $output = field_filter_xss(county_display_value($item['value']));
+        $output = str_replace($suffixes, '', $output);
+        $element[$delta] = array('#markup' => $output);
+      }
+      break;
+
+    case 'county_key':
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array('#markup' => field_filter_xss($item['value']));
+      }
+      break;
+
+    case 'county_all':
+      foreach ($items as $delta => $item) {
+        $output = field_filter_xss(county_display_value($item['value']) . " ({$item['value']})");
+        $element[$delta] = array('#markup' => $output);
+      }
+      break;
+  }
+
+  return $element;
+}
+
+/**
+ * Implements hook_field_widget_info().
+ */
+function county_field_widget_info() {
+  return array(
+    'county_select' => array(
+      'label' => t('Select list'),
+      'field types' => array('county'),
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_CUSTOM,
+      ),
+      'settings' => array(),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_widget_form().
+ */
+function county_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  switch ($instance['widget']['type']) {
+    case 'county_select':
+      // The parameters to hook_options_list(,,,$entity) include the storage
+      // value (in $entity) but not the current form value (in $element); store
+      // the options on the entity.
+      $admin_area = county_admin_value($form, $form_state, $instance, $langcode, $element);
+      // The '#entity' key is NULL on the field ui edit form.
+      $element['#entity'] = empty($element['#entity']) ? new stdClass() : $element['#entity'];
+      $element['#entity']->county_field_widget_options = county_widget_options($admin_area);
+
+      // Switch the widget type; build the form element.
+      $instance['widget']['type'] = 'options_select';
+      $element = options_field_widget_form($form, $form_state, $field, $instance, $langcode, $items, $delta, $element);
+      // Display up to 12 rows, not the 5 used by options module.
+      $element['#size'] = $element['#multiple'] ? min(12, count($element['#options'])) : 0;
+
+      // To handle multiple county elements on a form (but not necessarily
+      // across multiple forms on a page request), tied to the same or different
+      // admin_area elements, store an array keyed by the admin_area_field_name
+      // so that county_widget_refresh() can loop on the county fields tied to
+      // the triggering admin_area element.
+      $settings = $instance['settings'];
+      $admin_area_field_name = $settings['admin_area_field'];
+      $county_field_name = $instance['field_name'];
+      $langcode = empty($langcode) ? LANGUAGE_NONE : $langcode;
+      $form_state['county_field'][$admin_area_field_name][$county_field_name] = $langcode;
+/*
+      $options = county_widget_options($admin_area);
+      $default_value = is_array($items) && isset($items[$delta]) ? array_shift($items[$delta]) : '_none';
+      $default_value = isset($options[$default_value]) ? $default_value : '_none';
+      $cardinality = isset($instance['cardinality']) ? $instance['cardinality'] : $field['cardinality'];
+      $multiple = $cardinality != 1;
+
+      $element += array(
+        '#type' => 'select',
+        '#default_value' => $default_value,
+        '#options' => $options,
+        '#multiple' => $multiple && count($options) > 1,
+        '#size' => $multiple ? min(12, count($options)) : 0,
+      );
+      if ($multiple) {
+        $extra = array(
+          '#markup' => field_filter_xss('Use Ctrl+Click to select or deselect multiple items.'),
+        );
+      }
+*/
+      break;
+  }
+
+  return $element;
+
+  // If 'multiple values' => FIELD_BEHAVIOR_DEFAULT, then form API expects the
+  // widget form to return an array keyed by columns in the field storage. Hence
+  // something like return array('value' => $element). Field API adds this to an
+  // array keyed on $delta so the form structure matches the $items structure.
+  // If 'multiple values' => FIELD_BEHAVIOR_CUSTOM, then the field module is on
+  // its own. The options module is one such module; it ends the form array
+  // structure at the langcode key.
+  //
+  // To piggyback on the pattern of the options module, the 'value' key should
+  // be omitted. This is tied up in the calls to _options_form_to_storage and
+  // form_set_value. With the 'value' key in $element, the array in $form_state
+  // has the 'value' key between langcode and delta portion of the $items
+  // structure, like ['county']['und']['value'][0]['value'] => 01103. At the end
+  // of the day, the submitted values are not saved to the storage.
+
+  return isset($extra) ? array('value' => $element, 'instructions' => $extra) : array('value' => $element);
+}
+
+/**
+ * Implements hook_field_attach_form().
+ *
+ * This does the following:
+ * - sets a fixed ID on the county field wrapper DIV (needed for AJAX callback)
+ * - adds AJAX handling to a change of the administrative area field
+ *
+ * Prefer this hook to:
+ *   hook_form_alter() as it is called:
+ *   - only in the context of a form with a field
+ *   an after_build callback as it is called:
+ *   - before the form is cached (this is the retrieved form)
+ *   - as drupal_process_form() caches the $unprocessed_form
+ *   - so the '#ajax' stuff is present when called by ajax_form_callback()
+ *
+ * @see field_attach_form()
+ */
+function county_field_attach_form($entity_type, $entity, &$form, &$form_state, $langcode) {
+  if (empty($form_state['county_field'])) {
+    return;
+  }
+
+  foreach($form_state['county_field'] as $admin_area_field_name => $county_field_names) {
+    foreach($county_field_names as $county_field_name => $unused) {
+      // Fix the HTML ID for the Ajax callback.
+      // @todo Append the entity ID in case of multiple forms on page.
+      $form[$county_field_name]['#id'] = 'edit-county-wrapper-' . $county_field_name;
+    }
+
+    // @todo Is this element always present at this key?
+    $admin_area_element = &$form[$admin_area_field_name];
+    $langcode = empty($admin_area_element['#language']) ? LANGUAGE_NONE : $admin_area_element['#language'];
+
+    $parents = $form['#parents'];
+    $ajax = array(
+      // Only validate the administrative area field (the only dependent field).
+      // This eventually makes it the only value in $form_state['values'].
+//       '#limit_validation_errors' => array(array_merge($parents, array($admin_area_field_name, $langcode))),
+      '#limit_validation_errors' => array(
+        array_merge($parents, array($admin_area_field_name, $langcode)),
+        // Do not include the county field; an error will occur if it is required
+        // since it will have no value or an illegal value.
+//         array_merge($parents, array($county_field_name, $langcode)),
+      ),
+      '#ajax' => array(
+        'callback' => 'county_widget_refresh',
+        'effect' => 'fade', // @todo Add this to $settings in ajax_command_replace()?
+        'event' => 'change',
+      ),
+    );
+
+    $admin_area_field_type = $form_state['field'][$admin_area_field_name][$langcode]['field']['type'];
+    if ($admin_area_field_type == 'list_text') {
+      // A list_text field uses the options module for its widgets; the latter sets
+      // ['behaviors']['multiple values'] = FIELD_BEHAVIOR_CUSTOM. This property is
+      // checked in field_default_form() to determine whether to call
+      // field_multiple_value_form() and include a delta key in the form element.
+      // Because of this property, a list_text field does not have a delta key in
+      // its field form element.
+      // See options_field_widget_info().
+
+      // Check for a delta key before adding this ajax item.
+      $has_delta_key = isset($admin_area_element[$langcode]['#theme']) && $admin_area_element[$langcode]['#theme'] == 'field_multiple_value_form';
+      if ($has_delta_key) {
+        $admin_area_element[$langcode][0] += $ajax;
+      }
+      else {
+        $admin_area_element[$langcode] += $ajax;
+      }
+    }
+    else {
+      // A simple text field has a 'value' key which has the '#type' property
+      // and needs to have the '#ajax' property so ajax_pre_render_element()
+      // will process the element.
+      // @todo If we are to support other field types, then we may need to look
+      // at the field columns and use the first column in the array.
+      $admin_area_element[$langcode][0]['value'] += $ajax;
+    }
+  }
+}
+
+/**
+ * Implements hook_field_widget_error().
+ */
+function county_field_widget_error($element, $error, $form, &$form_state) {
+  form_error($element['value'], $error['message']);
+}
+
+/**
+ * Returns the administrative area value.
+ *
+ * This is either the last submitted value, the entity value, or NULL.
+ *
+ * @return string
+ *   The administrative area value.
+ */
+function county_admin_value($form, $form_state, $instance, $langcode, $element) {
+  $settings = $instance['settings'];
+//   $county_field_name = $form_state['county_field'];
+  $admin_area_field_name = $settings['admin_area_field'];
+
+  $key_exists = NULL;
+  $values = NULL;
+  if ($form_state['submitted'] /*&& isset($form_state['input']['_triggering_element_name']) && $form_state['input']['_triggering_element_name'] == $county_field_name . '_add_more'*/) {
+    // The commented conditions apply to the 'add another item' button. If
+    // clicked, then field API does not pass all values in $form_state['values']
+    // but only those for the county field. But $form_state['input'] has all the
+    // usual values including the 'admin_area' field value. With the conditions
+    // commented, this block will also be executed on regular form submission in
+    // which $form_state['values'] has all the usual values. Leave the next else
+    // block for reference.
+    //
+    // This is not all inclusive; on a wizard with a back button the form is
+    // submitted but the admin_area_field is not present in input array. Look at
+    // $key_exists for assistance.
+
+    // Start with submitted values.
+    // @see field_default_extract_form_values()
+    // The 'inputs' array ends at the 'langcode' key so omit it to return an
+    // array for consistency and as expected by code follwing this block.
+    $path = array_merge($form['#parents'], array($admin_area_field_name, /*$langcode*/));
+    $values = drupal_array_get_nested_value($form_state['input'], $path, $key_exists);
+  }
+  elseif (!empty($form_state['values'])) {
+    // Start with submitted values.
+    // @see field_default_extract_form_values()
+    $path = array_merge($form['#parents'], array($admin_area_field_name, $langcode));
+    $values = drupal_array_get_nested_value($form_state['values'], $path, $key_exists);
+  }
+/*
+  elseif (isset($element['#entity'])) {
+    // Fall back to entity values.
+    $entity_type = $element['#entity_type'];
+    $entity = $element['#entity'];
+    $values = field_get_items($entity_type, $entity, $admin_area_field_name, $langcode);
+  }
+  else {
+    // A new entity.
+    $values = NULL;
+  }
+*/
+  if (!$key_exists && isset($element['#entity'])) {
+    // Fall back to entity values.
+    $entity_type = $element['#entity_type'];
+    $entity = $element['#entity'];
+    $values = field_get_items($entity_type, $entity, $admin_area_field_name, $langcode);
+  }
+
+  // Grab first delta value, then first column value as applicable.
+  $values = is_array($values) ? array_shift($values) : '_none';
+  $value = is_array($values) ? array_shift($values) : $values;
+
+  return $value;
+}
+
+/**
+ * AJAX callback: Change of administrative area field.
+ */
+function county_widget_refresh($form, $form_state) {
+  $commands = [];
+  $admin_area_field_name = $form_state['triggering_element']['#field_name'];
+  foreach($form_state['county_field'][$admin_area_field_name] as $county_field_name => $langcode) {
+    if (!empty($form[$county_field_name])) {
+      $county_element = $form[$county_field_name];
+    }
+    else {
+      // The county element is nested in form array; find the parent keys.
+      $parents = $form_state['field'][$county_field_name][$langcode]['array_parents'];
+      // Remove the langcode key.
+      $parents = array_slice($parents, 0, -1);
+      $county_element = drupal_array_get_nested_value($form, $parents, $key_exists);
+      if (!$key_exists) {
+        // @todo Do something more in this case.
+        return [];
+      }
+    }
+    // Remove the '_weight' element inserted by the field API if cardinality != 1.
+    unset($county_element['_weight']);
+    $html = drupal_render($county_element);
+    if ($html) {
+      $selector = '#edit-county-wrapper-' . $county_field_name;
+      $commands[] = ajax_command_replace($selector, $html);
+    }
+  }
+  if ($selector) {
+    // This prepends the messages to the last selector.
+    $commands[] = ajax_command_prepend($selector, theme('status_messages'));
+  }
+  return ['#type' => 'ajax', '#commands' => $commands];
+}
+
+/**
+ * Returns a county options list suitable for a select element.
+ *
+ * @param string $admin_area
+ *   The administrative area value.
+ *
+ * @return array
+ *   The county list corresponding to the administrative area.
+ */
+function county_widget_options($admin_area) {
+  // See _options_get_options().
+  $temp['widget']['type'] = 'options_select';
+  $label = theme('options_none', array('instance' => $temp, 'option' => 'option_none'));
+  $options = array('_none' => $label);
+
+  if ($admin_area == '_none') {
+    // @todo Check the '#empty_value' property of the administrative area field.
+    return $options;
+  }
+
+  $args = array(':state' => $admin_area);
+  $result = db_query('SELECT fips_state, fips_county, county FROM {county_fips} WHERE state = :state', $args);
+  if (!$result) {
+    return $options;
+  }
+
+  // @todo Consider retrieving the fips_code and using it as basis to remove
+  // 'county' from string. Or making this a widget setting.
+  while ($row = $result->fetchAssoc()) {
+    $key = $row['fips_state'] . $row['fips_county'];
+    $options[$key] = $row['county'];
+  }
+  return $options;
+}
+
+/**
+ * Implements hook_options_list().
+ */
+function county_options_list($field, $instance, $entity_type, $entity) {
+  return $entity->county_field_widget_options;
+}
+
+/**
+ * Returns the county display value corresponding to the county FIPS value.
+ *
+ * @param string $county
+ *   The county FIPS value.
+ *
+ * @return string
+ *   The county display value.
+ */
+function county_display_value($county) {
+  $values = &drupal_static(__FUNCTION__, array());
+
+  if ($county == '_none' || !(strlen($county) == 5) && is_numeric($county) && is_integer($county)) {
+    return 'None';
+  }
+
+  if (isset($values[$county])) {
+    return $values[$county];
+  }
+
+  // Retrieve value from database.
+  // @todo Cache the entire state in one query as the most likely use case?
+  $args = array(
+    ':fips_state' => substr($county, 0, 2),
+    ':fips_county' => substr($county, 2, 3),
+  );
+  $result = db_query('SELECT county FROM {county_fips} WHERE fips_state = :fips_state AND fips_county = :fips_county', $args);
+  if (!$result) {
+    return 'None';
+  }
+  $values[$county] = $result->fetchField();
+
+  return $values[$county];
+}

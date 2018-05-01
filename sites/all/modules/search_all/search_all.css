@@ -1,0 +1,286 @@
+/*  Document   : search_all.css  */
+
+.searchaccordianselect {
+  background: url(DownIcon.png) no-repeat left;
+  background-position: 5px;
+  font-family: 'Oswald',sans-serif;
+  background-color:#E3E3E3;
+  border-top:1px solid #C7D8EA;
+  border-left:1px solid #C7D8EA;
+  border-right:1px solid #C7D8EA;
+  border-radius: 10px 10px 0px 0px;
+  color:#A60203;
+  font-weight:normal;
+  padding:4px 4px 8px 18px;
+  margin: 10px 0 1px ;
+}
+
+.searchaccordian{
+  background: url(RightIcon.png) no-repeat left;
+  font-family: 'Oswald',sans-serif;
+  background-position: 5px;
+  background-color:#E3E3E3;
+  border-top:1px solid #C7D8EA;
+  border-left:1px solid #C7D8EA;
+  border-right:1px solid #C7D8EA;
+  border-radius: 10px 10px 0px 0px;
+  color:#3C6086;
+  font-weight:normal;
+  padding:4px 4px 8px 18px;
+  margin: 10px 0 1px;
+}
+
+.title-promo {
+    margin: 7px 0 
+}
+
+#promoresults, #taggedresults,  #drupalresults, #onlyresults {
+  padding: 7px 8px;
+  margin: -7px 0 5px;
+  border-bottom:1px solid #C7D8EA;
+  border-left:1px solid #C7D8EA;
+  border-right:1px solid #C7D8EA;
+  border-radius: 0px 0px 10px 10px;
+}
+
+div.accord {
+  margin-left: 25px;
+}
+
+div.date_inline #edit-submit {
+  margin: 15px 0 ;
+}
+
+.container-inline-date .form-item input, .container-inline-date .form-item select, .container-inline-date .form-item option {
+    margin-right: 15px; 
+}
+
+.date-clear-block {
+  display: inline;
+}
+
+.date-clear-block:after {
+  clear: none;
+}
+
+.container-inline-date .form-item {
+  float: left;
+}
+
+.form-submit {
+    margin: 7px 15px 0 0;
+}
+
+.container-inline-date {
+    clear: none;
+}
+#side-searchbar {
+    height: 31px;
+    padding: 7px 0 5px 5px;
+    width: 95%;
+    margin: auto;
+}
+#side-searchbar h3 {
+  color: #575757;
+  margin: 0 0 0 14px;
+  padding: 15px 0 0 0;
+}
+#side-searchbar form {
+  width: 100%;
+  background: #fff;
+  float: left;
+/*  border-radius: 10px;
+  margin: 15px 0 10px 14px;*/
+}
+#side-searchbar form input {
+  width: 74%;
+  height: 25px;
+  float: left;
+  border: 0;
+  background: #fff;
+  padding: 0 0 0 10px;
+  font-size: 12px;
+  line-height: 20px;
+}
+#side-searchbar form input:focus {
+  outline: none;
+}
+
+#side-searchbar form .form-submit {
+  overflow: visible;
+  position: relative;
+  float: right;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  height: 25px;
+  width: 20%;
+  color: #000;
+  font-size: 12px;
+  text-transform: uppercase;
+/*  background: #fdcd32;*/
+  border-radius: 0;
+  background-image: url('images/search2.png');
+  background-repeat: no-repeat; 
+  background-position: 2px 2px;
+}
+#side-searchbar .form-item{
+    margin: 0;
+}
+#side-searchbar .form-submit{
+    margin: 0;
+}
+#searchbar-wrapper {
+  height: 70px;
+  border-top: 1px solid #a5a5a6;
+  border-bottom: 1px solid #a5a5a6;
+  background: #e3e3e3;
+  background-image: linear-gradient(to bottom,#ffffff 0%, #e3e3e3 100%);
+  background-image: -o-linear-gradient(top, #ffffff 0%, #e3e3e3 100%);
+  background-image: -moz-linear-gradient(top, #ffffff 0%, #e3e3e3 100%);
+  background-image: -webkit-linear-gradient(top, #ffffff 0%, #e3e3e3 100%);
+  background-image: -ms-linear-gradient(top, #ffffff 0%, #e3e3e3 100%);
+/*  filter: progid:dximagetransform.microsoft.gradient(startColorstr=#ffffff, endColorstr=#e3e3e3);*/
+  /* for IE */
+
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #ffffff), color-stop(1, #e3e3e3));
+}
+#searchbar h3 {
+  color: #575757;
+  font-size: 30px;
+  line-height: 68px;
+  float: left;
+}
+#searchbar form {
+  width: 35%;
+  background: #fff;
+  border-radius: 10px;
+  float: left;
+  margin: 12px 0 0 26px;
+}
+#searchbar form input {
+  width: 65%;
+  height: 20px;
+  padding: 8px 5px;
+  float: left;
+  border: 0;
+  background: #fff;
+  border-radius: 10px 0 0 10px;
+  font-size: 16px;
+}
+#searchbar form input:focus {
+  outline: none;
+}
+#searchbar form button {
+  overflow: visible;
+  position: relative;
+  float: right;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  height: 40px;
+  width: 23%;
+  line-height: 40px;
+  color: #968710;
+  text-transform: uppercase;
+  background: #f9e11d;
+  border-radius: 0 10px 10px 0;
+  background: #f6dd1c;
+  background-image: linear-gradient(to bottom, #f6dd1c 0%, #e4cc18 100%);
+  background-image: -o-linear-gradient(top, #f6dd1c 0%, #e4cc18 100%);
+  background-image: -moz-linear-gradient(top, #f6dd1c 0%, #e4cc18 100%);
+  background-image: -webkit-linear-gradient(top, #f6dd1c 0%, #e4cc18 100%);
+  background-image: -ms-linear-gradient(top, #f6dd1c 0%, #e4cc18 100%);
+/*  filter: progid:dximagetransform.microsoft.gradient(startColorstr=#f6dd1c, endColorstr=#e4cc18);*/
+  /* for IE */
+
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #f6dd1c), color-stop(1, #e4cc18));
+}
+#searchbar form button img {
+  float: right;
+  margin-right: 10px;
+  margin-top: 9px;
+}
+#searchbar form #edit-statesidesearch-term {
+  width: 450px;
+  height: 20px;
+  padding: 8px 5px;
+  float: left;
+  border: 0;
+  background: #fff;
+  border-radius: 10px 0 0 10px;
+}
+#searchbar form #edit-statesidesearch-term:focus {
+  outline: none;
+}
+#searchbar form .form-submit {
+  overflow: visible;
+  position: relative;
+  float: right;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  text-indent: 10px;
+  cursor: pointer;
+  height: 39px;
+  width: 25%;
+  line-height: 40px;
+  color: #968710;
+  text-transform: uppercase;
+  background: #f9e11d;
+  border-radius: 0 10px 10px 0;
+  background: #f6dd1c;
+  background-image: linear-gradient(to bottom, #f6dd1c 0%, #e4cc18 100%);
+  background-image: -o-linear-gradient(top, #f6dd1c 0%, #e4cc18 100%);
+  background-image: -moz-linear-gradient(top, #f6dd1c 0%, #e4cc18 100%);
+  background-image: -webkit-linear-gradient(top, #f6dd1c 0%, #e4cc18 100%);
+  background-image: -ms-linear-gradient(top, #f6dd1c 0%, #e4cc18 100%);
+ 
+  /* for IE */
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #f6dd1c), color-stop(1, #e4cc18));
+  background-image: url("/images/search1.png");
+  background-repeat: no-repeat;
+  background-position: 50% 10px;
+
+}
+#searchbar .form-item{
+    margin: 0;
+}
+#searchbar .form-submit{
+    margin: 0;
+}
+#search_all-set-advocate{
+    margin-bottom: 10px;
+}
+#search_all-button-title{
+    padding-top: 5px;
+}
+#search-all-advocate,
+    #search_all-button-title{
+    color: #A60203;
+    float: right;
+}
+.advocate-show{
+    display: block;
+}
+.advocate-no-show{
+    display: none;
+}
+div.waiting {
+    background-image: url("images/waiting.gif") !important;
+    background-repeat: no-repeat !important; 
+    background-position: 0 30px;
+    position: fixed;
+    top: 30%;
+    left: 45%;
+    width: 150px;
+    height: 30px;
+    z-index: 999;
+    text-align: center;
+    background: #fff;
+    border: 5px solid #333;
+    border-style: ridge;
+    padding-top: 150px;
+    font-weight: bold;
+}

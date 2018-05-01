@@ -1,0 +1,6 @@
+name = "NCD Client"
+description = "Provides RSS sharing functionality for nodes."
+package = "OST-NCD"
+core = "6.x"
+
+version = "6.x-1.0"

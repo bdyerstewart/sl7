@@ -1,0 +1,302 @@
+<?php
+
+/*
+ * @file
+ * Drupal Module: Tingwo
+ * Adds a button and opens a pop-up to the commercial web service Tingwo (text to speech)
+ *
+ */
+
+/**
+ * Implements hook_block_info
+ */
+function tingwo_block_info() {
+    $blocks = array();
+    $blocks['tingwo'] = array(
+        'info' => t('Tingwo Block'),
+        'cache' => DRUPAL_NO_CACHE,
+    );
+    return $blocks;
+}
+
+/**
+ * Implements hook_block_view
+ */
+function tingwo_block_view($delta) {
+    $block = array();
+    switch ($delta) {
+        case 'tingwo':
+            $node = menu_get_object();
+            //dsm($node);
+            // Check were on a node
+            if (isset($node->nid)) {
+                $block['content'] = theme_tingwo_render($node);
+                $block['cache'] = DRUPAL_NO_CACHE;
+            }
+            break;
+    }
+    return $block;
+}
+
+/**
+ * Implementation of hook_init().
+ */
+function tingwo_init() {
+    drupal_add_js(drupal_get_path('module', 'tingwo') . '/js/tingwo.js');
+}
+
+/**
+ * Function invoked directly from the template
+ */
+function theme_tingwo_button($node) {
+    echo theme('tingwo_render', $node);
+}
+
+/**
+ * Render the form or link to the audio file, called via a block hook
+ */
+function theme_tingwo_render($node) {
+    if (variable_get('tingwo_node_' . $node->type, 0) == 0) {
+        return '';
+    } else {
+        $tingwo_nodeurl = urlencode(url('node/' . $node->nid, array('fragment' => '', 'query' => '', 'absolute' => TRUE, 'alias' => FALSE, 'prefix' => '')));
+        $tingwo_customerid = variable_get("tingwo_customerid", "");
+        $tingwo_url = "http://webvoice.tingwo.co/" . $tingwo_customerid . "vox?url=" . $tingwo_nodeurl;
+        $tingwo_button = '<div id="vox">
+                            <a href="' . $tingwo_url . '" onClick="tingwo_popup(\'' . $tingwo_url . '\'); return false;" accesskey="L" target="_vox">
+                              ' . theme_image(array('path' => 'http://tingwo.co/resources/buttons/' . variable_get("tingwo_buttontype", ""), 'alt' => 'Listen to this Page. Powered by Tingwo.co', 'title' => 'Listen to this Page. Powered by Tingwo.co', 'attributes' => array())) . '
+                            </a>
+                          </div>';
+        return $tingwo_button;
+    }
+}
+
+/**
+ * Render the VOICE_BEGIN comment with the hidden node title
+ */
+function theme_tingwo_begin($node) {
+    if (variable_get('tingwo_node_' . $node->type, 0) == 0) {
+        return '';
+    } else {
+        return '<!-- VOICE_BEGIN --><div style="display: none">' . $node->title . '</div>';
+    }
+}
+
+/**
+ * Render the VOICE_END comment
+ */
+function theme_tingwo_end($node) {
+    if (variable_get('tingwo_node_' . $node->type, 0) == 0) {
+        return '';
+    } else {
+        return '<!-- VOICE_END -->';
+    }
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function tingwo_theme() {
+    return array(
+        'tingwo_render' => array(
+            'arguments' => array('node' => NULL)
+        ),
+        'tingwo_button' => array(
+            'arguments' => array('node' => NULL)
+        ),
+        'tingwo_begin' => array(
+            'arguments' => array('node' => NULL)
+        ),
+        'tingwo_end' => array(
+            'arguments' => array('node' => NULL)
+        )
+    );
+}
+
+/*
+ * Implements hook_node_view
+ */
+
+function tingwo_node_view($node, $view_mode, $langcode) {
+    $node->content["tingwo_begin"]["#markup"] = theme_tingwo_begin($node);
+    $node->content["tingwo_begin"]["#weight"] = variable_get('tingwo_begin_weight', '');
+
+    $node->content["tingwo_end"]["#markup"] = theme_tingwo_end($node);
+    $node->content["tingwo_end"]["#weight"] = variable_get('tingwo_end_weight', '');
+    
+    return $node;
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function tingwo_form_alter(&$form, $form_state, $form_id) {
+    if ($form_id == 'node_type_form') {
+        $form['identity']['tingwo'] = array(
+            '#type' => 'checkbox',
+            '#title' => t('Enable Tingwo'),
+            '#default_value' => variable_get('tingwo_node_' . $form['#node_type']->type, 1),
+        );
+        
+        // Adds submit function
+        $form['#submit'][] = '_tingo_type_form_submit';
+    }
+}
+
+/**
+ * Show the fields to customize the service in the admin section
+ */
+function tingwo_admin() {
+    $tingwo_module_path = drupal_get_path('module', 'tingwo');
+    drupal_add_css($tingwo_module_path . '/css/tingwo-admin.css', 'module', 'all', FALSE);
+    $form = array();
+
+    $node_types = node_type_get_types();
+    if ($node_types) {
+        $form['node_settings'] = array(
+            '#type' => 'fieldset',
+            '#title' => t('Enable on'),
+            '#description' => t('Enable or disable the service on the following content type.'),
+            '#prefix' => '<div class="tingwo-settings-right">',
+            '#suffix' => '</div>',
+        );
+        foreach ($node_types as $t => $type) {
+            $form['node_settings']["tingwo_node_$t"] = array(
+                '#type' => 'checkbox',
+                '#title' => check_plain($type->name),
+                '#attributes' => (variable_get('tingwo_node_' . $t, 0) == 1 ? array('checked' => "checked") : array())
+            );
+        }
+    }
+
+    $form['account_settings'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Account Settings'),
+        '#description' => t('Insert the parameters assigned by the service.'),
+        '#prefix' => '<div class="tingwo-settings-left">',
+        '#suffix' => '</div>',
+    );
+    $form['account_settings']['tingwo_customerid'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Customer ID'),
+        '#default_value' => variable_get('tingwo_customerid', ''),
+        '#size' => 20,
+        '#maxlength' => 128,
+        '#description' => t('Your Tingwo customer ID.'),
+        '#required' => TRUE
+    );
+
+    $form['display_settings'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Display Settings'),
+        '#description' => t('Choose the way to display the button on your pages.'),
+        '#prefix' => '<div class="tingwo-settings-left">',
+        '#suffix' => '</div>',
+    );
+    $imageButtonTypesOptions = array(
+        "button_70.png" => theme_image(array('path' => 'http://tingwo.co/resources/buttons/button_70.png', 'alt' => 'listen this page', 'title' => 'Tingwo', 'attributes' => array())),
+        "button_80.png" => theme_image(array('path' => 'http://tingwo.co/resources/buttons/button_80.png', 'alt' => 'listen this page', 'title' => 'Tingwo', 'attributes' => array())),
+        "button_90.png" => theme_image(array('path' => 'http://tingwo.co/resources/buttons/button_90.png', 'alt' => 'listen this page', 'title' => 'Tingwo', 'attributes' => array())),
+        "button_113.png" => theme_image(array('path' => 'http://tingwo.co/resources/buttons/button_113.png', 'alt' => 'listen this page', 'title' => 'Tingwo', 'attributes' => array())),
+    );
+    $form['display_settings']['tingwo_buttontype'] = array(
+        '#type' => 'radios',
+        '#title' => t('Button type'),
+        '#description' => t('Select which image you want to use as button.'),
+        '#default_value' => variable_get('tingwo_buttontype', ''),
+        '#options' => $imageButtonTypesOptions
+    );
+
+    $form['advanced_settings'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Advanced Settings'),
+        '#description' => t('The module automatically detects the node content to read. If some part was skipped, you can adjust the weights of start and end tag.'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#prefix' => '<div class="tingwo-settings-bottom">',
+        '#suffix' => '</div>',
+    );
+    $form['advanced_settings']['tingwo_begin_weight'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Begin priority'),
+        '#default_value' => variable_get('tingwo_begin_weight', ''),
+        '#size' => 5,
+        '#maxlength' => 128,
+        '#description' => t('Priority for &lt;!-- VOICE_BEGIN --&gt; tag'),
+        '#required' => TRUE
+    );
+    $form['advanced_settings']['tingwo_end_weight'] = array(
+        '#type' => 'textfield',
+        '#title' => t('End priority'),
+        '#default_value' => variable_get('tingwo_end_weight', ''),
+        '#size' => 5,
+        '#maxlength' => 128,
+        '#description' => t('Priority for &lt;!-- VOICE_END --&gt; tag'),
+        '#required' => TRUE
+    );
+
+    return system_settings_form($form);
+}
+
+/**
+ * Validate the admin form
+ */
+function tingwo_admin_validate($form, &$form_state) {
+    if (!is_string($form_state['values']['tingwo_customerid']) || drupal_strlen($form_state['values']['tingwo_customerid']) < 1) {
+        form_set_error('tingwo_customerid', t('You must enter a customer name'));
+    }
+    if (!is_numeric($form_state['values']['tingwo_begin_weight'])) {
+        form_set_error('tingwo_begin_weight', t('You must enter a number for Begin priority'));
+    }
+    if (!is_numeric($form_state['values']['tingwo_end_weight'])) {
+        form_set_error('tingwo_end_weight', t('You must enter a number for End priority'));
+    }
+    if (!is_string($form_state['values']['tingwo_buttontype'])) {
+        form_set_error('tingwo_buttontype', t('You must choose an image for the button'));
+    }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function tingwo_menu() {
+    $tingwo_access = array('administer Tingwo settings');
+    $items = array();
+    $items['admin/config/media/tingwo'] = array(
+        'title' => 'Tingwo settings',
+        'description' => 'Settings for Tingwo integration',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('tingwo_admin'),
+        'access arguments' => $tingwo_access,
+        'type' => MENU_NORMAL_ITEM,
+    );
+    return $items;
+}
+
+/**
+ * Implements hook_perm().
+ */
+function tingwo_perm() {
+    return array('administer tingwo settings');
+}
+
+/**
+ * Implements hook_help().
+ */
+function tingwo_help($path, $arg) {
+    switch ($path) {
+        case 'admin/settings/tingwo':
+            return t('<p> Visit <a href="@url">@url</a> for creating an account.</p>', array('@url' => url('http://tingwo.co')));
+    }
+}
+
+/**
+ * Save variable data
+ */
+function _tingo_type_form_submit($form, $form_state){
+    // Save variable
+    $type = $form_state['values']['type'];
+    $tingwo = $form_state['values']['tingwo'];
+    variable_set('tingwo_node_' . $type, $tingwo);
+}
+

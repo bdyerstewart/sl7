@@ -1,0 +1,2300 @@
+<?php
+
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/triage_actions.forms.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/includes/triage_custom_text_form.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/includes/triage_node_form.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/includes/triage_reusable_form.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/includes/triage_div_form.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/includes/triage_group_form.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/includes/triage_form_form.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/includes/triage_func_form.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/includes/triage_srch_form.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage_actions') . '/includes/triage_orgsrch_form.inc';
+
+$module_path = drupal_get_path('module', 'htmLawed');
+include_once("$module_path/htmLawed/htmLawed.php");
+function triage_actions_init() {
+  $css_file = variable_get('triage_custom_css', '');
+  if ($css_file > '') {
+    $css_file = path_to_theme() . $css_file;
+    drupal_add_css($css_file, array('group' => CSS_THEME, 'type' => 'file'));
+  }
+  triage_init();
+}
+
+// Implements hook_menu().
+function triage_actions_menu() {
+  $items = array();
+
+  // itemshow manage page.
+  $items['admin/config/user-interface/itemshow'] = array(
+    'title' => 'itemshow',
+    'description' => 'Manage itemshow list.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_actions_manage'),
+    'access arguments' => array('administer triage page'),
+  );
+
+  // Autocomplete callback.
+  $items['triage_node_title_autocomplete'] = array(
+    'page callback' => '_triage_actions_autocomplete',
+    'access arguments' => array('administer triage page'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_template_autocomplete'] = array(
+    'page callback' => '_triage_template_autocomplete',
+    'access arguments' => array('administer triage page'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_actions_process'] = array(
+    'title' => 'Help for Your Legal Problem',
+    'page callback' => 'triage_actions_processpgm',
+    'access arguments' => array('view triage page'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_actions_process/%'] = array(
+    'title' => 'Help for Your Legal Problem',
+    'page callback' => 'triage_actions_processpgm',
+    'access callback' => TRUE,
+    'page arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+  $items['taxonomy/term/%/actions'] = array(
+    'title' => 'Triage Actions Builder',
+    'description' => 'Triage Actions Builder',
+    'access callback' => 'triage_taxonomy_local_menu',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'triage_actions',
+    'page arguments' => array(2),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['node/%/triage_config'] = array(
+    'title' => 'Triage Configuration',
+    'description' => 'Triage Configuration Settings',
+    'access callback' => 'triage_page_local_menu',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_setup_form'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['node/%/triage_config/setup'] = array(
+    'title' => '1. Essential Setup',
+    'description' => 'Triage Configuration Settings',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['node/%/triage_config/config'] = array(
+    'title' => '2. Text, Button and CSS Settings',
+    'description' => 'Triage Configuration Settings for a variety of text labels, button configuration and general css',
+    'access callback' => 'triage_page_local_menu',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_config_form'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['node/%/triage_config/alt'] = array(
+    'title' => '3. Master Triage Page Styling',
+    'description' => 'Triage Configuration Settings for custom display',
+    'access callback' => 'triage_page_local_menu',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_config_alt'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['node/%/triage_build'] = array(
+    'title' => 'Triage Action Builder',
+    'description' => 'Triage Action Builder for display before Questions',
+    'access arguments' => array('administer triage page'),
+    'access callback' => 'triage_page_local_menu',
+    'page callback' => 'triage_actions',
+    'page arguments' => array(1, 'node'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['node/%/triage_build/actions'] = array(
+    'title' => '1. Triage Pre-Question Builder',
+    'description' => 'Triage Action Builder for display before Questions',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['node/%/triage_build/actions_questions'] = array(
+    'title' => '2. Questions Help Builder',
+    'description' => 'Triage Actions Builder for display on Triage Questions pages',
+    'access arguments' => array('administer triage page'),
+    'access callback' => 'triage_page_local_menu',
+    'page callback' => 'triage_actions',
+    'page arguments' => array(1, 'quests'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['node/%/triage_build/actions_out'] = array(
+    'title' => '3. Triage Output Builder',
+    'description' => 'Triage Output Actions Builder for display on the output results page',
+    'access callback' => 'triage_page_local_menu',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'triage_actions',
+    'page arguments' => array(1, 'help'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['node/%/triage_org_filter'] = array(
+    'title' => 'Organizational Criteria',
+    'description' => 'Builder to create complex eligibility criteria for organizations',
+    'access arguments' => array('administer triage page'),
+    'access callback' => 'triage_org_local_menu',
+    'page callback' => 'triage_org_filters',
+    'page arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['taxonomy/actions/%/text/edit'] = array(
+    'title' => 'Triage Action Editor',
+    'description' => 'Triage Action Editor',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_action_text_form', 2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['taxonomy/actions/%/text/edit/%'] = array(
+    'title' => 'Triage Action Editor',
+    'description' => 'Triage Action Editor',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_action_text_form', 2, 5),
+    'type' => MENU_CALLBACK,
+  );
+  $items['taxonomy/actions/%/node/edit'] = array(
+    'title' => 'Triage Action Editor',
+    'description' => 'Triage Action Editor',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_action_node_form', 2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['taxonomy/actions/%/func/edit'] = array(
+    'title' => 'Triage Action Editor',
+    'description' => 'Triage Action Editor - Function Form',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_action_func_form', 2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['taxonomy/actions/%/srch/edit'] = array(
+    'title' => 'Triage Action Editor - Search Form',
+    'description' => 'Triage Action Editor',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_action_srch_form', 2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['taxonomy/actions/%/orgsrch/edit'] = array(
+      'title' => 'Triage Action Editor - Organization Search Form',
+      'description' => 'Triage Action Editor',
+      'access arguments' => array('administer triage page'),
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('triage_action_orgsrch_form', 2),
+      'type' => MENU_CALLBACK,
+    );
+  $items['triage_org_filter/%/edit'] = array(
+      'title' => 'Edit Organization Filters',
+      'description' => 'Triage Org Filters',
+      'access arguments' => array('view triage page'),
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('triage_org_filter_form',1),
+      'type' => MENU_CALLBACK,
+    );
+  $items['taxonomy/actions/%/reuse/edit'] = array(
+    'title' => 'Triage Action Editor',
+    'description' => 'Triage Action Editor - Reusable Text Form',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_action_reuse_form', 2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['taxonomy/actions/%/div/edit'] = array(
+    'title' => 'Triage Action Editor - Display Wrapper',
+    'description' => 'Triage Action Editor',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_action_div_form', 2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['taxonomy/actions/%/form/edit'] = array(
+    'title' => 'Triage Action Editor - Forms',
+    'description' => 'Triage Action Editor',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_action_form_form', 2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['taxonomy/actions/%/group/edit'] = array(
+    'title' => 'Triage Action Editor - Navigation Wrapper',
+    'description' => 'Triage Action Editor',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_action_group_form', 2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_actions_admin'] = array(
+    'title' => 'Triage Actions Manager',
+    'description' => 'Triage Actions Manager',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'triage_actions_admin',
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_actions_reuse_editor'] = array(
+    'title' => 'Triage Actions Text Editor',
+    'description' => 'Triage Actions Text Editor',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'triage_actions_reusable_admin',
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_actions_delete/%'] = array(
+    'title' => 'Delete Triage Action',
+    'description' => 'Delete Triage Action',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_actions_delete_confirm', 1),
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_actions_translate/%'] = array(
+    'title' => 'Translate Triage Action',
+    'description' => 'Translate Triage Action',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'triage_actions_translist',
+    'page arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_actions_preview'] = array(
+    'page callback' => 'triage_actions_preview',
+    'access arguments' => array('administer triage page'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_get_title/%'] = array(
+    'title' => 'Triage Get Title',
+    'description' => 'Get Title from node nid',
+    'access arguments' => array('view triage page'),
+    'page callback' => 'triage_get_title',
+    'page arguments' => array(1, TRUE),
+    'type' => MENU_CALLBACK,
+  );
+
+
+
+  return $items;
+}
+
+function triage_taxonomy_local_menu($options = array()) {
+  //access triage builder tabs only if the user has access and the node type is triage_page
+  $bds = '';
+  $vocs = db_query("select value from ta_variable where name = 'triage_vocabulary'");
+  $vids = array();
+  foreach ($vocs as $voc) {
+    $val = unserialize($voc->value);
+    $vids[] = $val;
+  }
+  if (!user_access($options)) {
+    return FALSE;
+  }
+  $tid = arg(2);
+  $term = taxonomy_term_load($tid);
+  if (in_array($term->vid, $vids)) {
+    //return FALSE;
+    return TRUE;
+  }
+  else {
+    return FALSE;
+  }
+}
+
+function triage_page_local_menu($options = array()) {
+  //access triage builder tabs only if the user has access and the taxonomy vocabulary is a triage voc
+  if (!user_access($options)) {
+    return FALSE;
+  }
+  $node = node_load(arg(1));
+  if ($node && $node->type != 'triage_page') {
+    return FALSE;
+  }
+  else {
+    return TRUE;
+  }
+}
+function triage_org_local_menu($options = array()) {
+  //access triage builder tabs only if the user has access and the taxonomy vocabulary is a triage voc
+  if (!user_access($options)) {
+    return FALSE;
+  }
+  $node = node_load(arg(1));
+  if ($node && $node->type != 'organization') {
+    return FALSE;
+  }
+  else {
+    if (variable_get('triage_use_multiple_org_filters', FALSE)) {
+      return TRUE;
+    }
+    else{
+      return FALSE;
+    }
+  }
+}
+function triage_actions_translist($id = NULL, $type = 'text') {
+  $output = "";
+  global $base_url;
+  if (is_null($id)) {
+    return "No action was selected";
+  }
+  global $language;
+  $rows = array();
+  $langs = i18n_element_language_select();
+  $opts = array_keys($langs['#options']);
+  $key = array_search('und', $opts);
+  $options = array('query' => drupal_get_destination(),);
+  unset($opts[$key]);
+  foreach ($opts as $opt) {
+    $find = NULL;
+    $key = $opt;
+    $lang = $langs['#options'][$opt];
+    // see if action exists for this language
+    $title = db_query('select title from triage_actions 
+              where id = :id', array(':id' => $id))->fetchColumn();
+    $status = "No translation yet";
+    $path = $base_url . "/taxonomy/actions/" . $id . "/" . $type . "/edit/" . $key;
+    //$op = "<a href='" . $path . "'>Add</a>" ; 
+    $op = l('Add', $path, $options);
+    $find = db_query('select entity_id from triage_actions where id = :id and language = :lang', array(
+      ':id' => $id,
+      ':lang' => $key
+    ))->fetchColumn();
+    if ($find) {
+      $status = 'Translated';
+      $path = "taxonomy/actions/" . $id . "/" . $type . "/edit/" . $key;
+      //$op = "<a href='" . $path . "'>Edit</a>" ; 
+      $op = l('Edit', $path, $options);
+    }
+    $rows[] = array(
+      $lang,
+      $title,
+      $status,
+      $op,
+    );
+  }
+  //dsm($rows);
+  $header = array(t('Language'), t('Title'), t('Status'), t('Op'));
+  $output .= "<div id='triage-actions-trans'>";
+  $output .= theme('table', array(
+    'header' => $header,
+    'rows' => $rows,
+    'attributes' => array('id' => 'triage-actions-translate')
+  ));
+  $output .= "</div>";
+  return $output;
+}
+
+function triage_actions_show_tabs($nid = NULL) {
+  $priv = FALSE;
+  if (!is_null($nid)) {
+    $testnode = node_load($nid);
+    if ($testnode->type == "triage_page") {
+      $priv = TRUE;
+    }
+  }
+  return $priv;
+}
+
+function _triage_actions_autocomplete($string) {
+  $items = array();
+  $query = db_select('node', 'n');
+  // Select rows that match the string
+  $return = $query
+    ->fields('n', array('title', 'nid'))
+    ->condition('n.title', '%' . db_like($string) . '%', 'LIKE')
+    ->range(0, 20)
+    ->execute();
+  foreach ($return as $obj) {
+    $items[$obj->nid] = check_plain($obj->title);
+  }
+
+  // return for JS
+  drupal_json_output($items);
+}
+
+function _triage_template_autocomplete($string) {
+  $items = array();
+  $query = db_select('triage_actions', 't');
+  // Select rows that match the string
+  $return = $query
+    ->fields('t', array('extra'))
+    ->condition('t.extra', '%' . db_like($string) . '%', 'LIKE')
+    ->condition('t.type', 'div')
+    ->range(0, 20)
+    ->execute();
+  foreach ($return as $obj) {
+    $items[$obj->extra] = check_plain($obj->extra);
+  }
+
+  // return for JS
+  drupal_json_output($items);
+
+}
+
+function triage_actions_admin_paths() {
+  //return;
+  $paths = array(
+    'taxonomy/term/*/actions' => TRUE,
+    'taxonomy/term/*/translate' => TRUE,
+    'taxonomy/actions/*/*/edit' => TRUE,
+    'taxonomy/actions/*/*/edit/*' => TRUE,
+    'triage_actions_translate*' => TRUE,
+    'triage_actions_process*' => FALSE,
+    'node/*/actions*' => TRUE,
+    'triage_actions_delete/*' => TRUE,
+    'node/%/triage_org_filter' => TRUE,
+    'triage_org_filter/%/edit' => TRUE,
+  );
+  return $paths;
+}
+
+// Implements hook_theme().
+function triage_actions_theme($existing, $type, $theme, $path) {
+  return array(
+    'triage_actions_manage' => array(
+      'render element' => 'form',
+    ),
+  );
+}
+
+function triage_actions_wysiwyg_editor_settings_alter(&$settings, $context) {
+  $url = current_path();
+  //dsm($url);
+  if (strpos($url, 'taxonomy/actions') !== FALSE) {
+    if ($context['profile']->editor == 'ckeditor') {
+      $settings['height'] = 100;
+    }
+  }
+}
+
+function triage_actions_processpgm($tid = NULL, $preview = 0) {
+  //dsm($_SESSION['triage']['my_path']);
+  $org_info = array();
+  if (isset($_GET['sid']) && $_GET['sid']){
+    $sid = $_GET['sid'];
+    $restore_session = db_query('select value from triage_session where sid = :sid', array(':sid'=>$sid))->fetchcolumn();
+    $_SESSION['triage'] = unserialize($restore_session);
+  }
+  $_SESSION['triage']['end_nodes'] = array();
+  $_SESSION['triage']['time_end'] = time();
+  global $base_url;
+  global $user;
+  global $language;
+  if ($tid) {
+    $tid = intval($tid);
+    $myhelp = null;
+    setcookie('triage_last_tid', $tid, time() + (86400 * 30), "/");
+    $_SESSION['triage']['triage_final_tid'] = $tid;
+    $term = taxonomy_term_load($tid);
+    if (isset($term->field_results_title['und'])) {
+      $myhelp = $term->field_results_title['und'][0]['value'];
+    }
+    //dsm($term);
+    if ($myhelp) {
+      $mytitle = '<h1 class="triage-out">Help for Your Legal Problem</h1>';
+      $mytitle .= '<h3>' . t(drupal_html_to_text($myhelp)) . '</h3>';
+      drupal_set_title($mytitle, PASS_THROUGH);
+    }
+    $_SESSION['triage']['triage_last_stop'] = $term->name;
+  }
+
+  drupal_add_js($base_url . '/misc/jquery.cookie.js');
+  $vid = db_query('select vid from taxonomy_term_data where tid=:tid', array(':tid' => $tid))->fetchColumn();
+  $_SESSION['triage']['triage_current_voc'] = $vid;
+  $_SESSION['triage']['triage_preview'] = $preview;
+  $return_dest = $base_url . '/taxonomy/term/' . $tid . '/actions';
+  $regions = array(
+    'ta-message-panel',
+    'ta-main-panel',
+    'ta-help-panel',
+    'ta-bottom-panel'
+  );
+  $bundles = array('help', 'taxonomy');
+  // Process taxonomy actions per region/bundle type
+  $output = '';
+  if ($preview == 1) {
+    $output .= "<div class='preview contextual-links-region'>
+                  <h5 class='preview'>
+                  <a  href='" . $return_dest . "'>Preview only - Return to action builder</a></h5>";
+  }
+  if ($preview == 2) {
+    $output .= "<div class='preview contextual-links-region'>
+                  <h5 class='preview'>
+                  <a href='" . $return_dest . "'>Preview only - Return to Action Manager</a></h5>";
+  }
+  if ($preview !== FALSE && $preview !== 3) {
+    $output .= "</div>";
+  }
+
+  // Progress Bar Code
+  $tp_node = triage_get_page($vid);
+  $nid = $tp_node->nid;
+  $use_div_order = ta_variable_get('triage_order_action_divs', FALSE, $nid);
+  $grp_array = db_query("select id from triage_actions 
+                        where bundle='node'
+                        and type = 'group'
+                        and entity_id = :entity_id
+                        order by weight",
+    array(':entity_id' => $nid))->fetchCol();
+  $group_num = count($grp_array);
+  $group_text = array();
+  $steps = array();
+  foreach ($grp_array as $grp) {
+    $group_text[$grp] = triage_group_text($grp);
+    $steps[] = $grp;
+  }
+  if (TRUE) {
+    // setup progress bar variables and send to javascript
+    $steps[] = 0;
+    $my_group = array($group_text);
+    drupal_add_js(array('my_group' => $group_text), 'setting');
+    drupal_add_js(array('sa_url' => $_SESSION['triage']['triage_sa_extra']), 'setting');
+    drupal_add_js(array('my_steps' => $steps), 'setting');
+    $my_progress_bar = array();
+    $my_progress_bar['background'] = ta_variable_get('triage_progress_background', "#fff", $nid);
+    $my_progress_bar['border'] = ta_variable_get('triage_progress_border', "#aaa", $nid);
+    $my_progress_bar['selected_back'] = ta_variable_get('triage_progress_selected_background', "#133785", $nid);
+    $my_progress_bar['text'] = ta_variable_get('triage_progress_text', "#000", $nid);
+    $my_progress_bar['selected_text'] = ta_variable_get('triage_progress_selected_text', "#fff", $nid);
+    $my_progress_bar['icon_color'] = ta_variable_get('triage_progress_icon_color', "#aaa", $nid);
+    $my_progress_bar['title'] = ta_variable_get('triage_progress_bar_title', "Triage Progress", $nid);
+    $my_progress_bar['extra_step'] = ta_variable_get('triage_progress_extra_step', FALSE, $nid);
+    $my_progress_bar['type'] = ta_variable_get('triage_progress_type', 'bar', $nid);
+    drupal_add_js(array('my_progress_bar' => $my_progress_bar), 'setting');
+  }
+  // Graphic Display for Steps
+  if (ta_variable_get('triage_use_progress_bar', FALSE, $nid)
+    && ta_variable_get('triage_progress_extra_step', FALSE, $nid)
+    && ta_variable_get('triage_progress_type', 'bar', $nid) == 'bar'
+  ) {
+    if (is_null($tid)) {
+      //Set variables
+      $progress_title = ta_variable_get('triage_progress_bar_title', "Triage Progress", $nid);
+      $num = count($steps);
+      $step_width = 95 / ($num + 1);
+      $output .= '<div class="triage-progress-container">';
+      $output .= '<div class="triage-progress-bar" >' . $progress_title . ' (Step ' . ($num + 1) . ' of ' . ($num + 1) . ')</div>';
+      $output .= '<div class="triage-steps">';
+      $x = 1;
+      foreach ($group_text as $key => $grp) {
+        $classes = 'triage-step';
+        $icon_class = '';
+        //if ($x==1){$classes .= ' active first ';}
+        $output .= "<div id='step-" . $key . "' class='" . $classes . "' style='width:" . $step_width . "%;'>" . $x . ". " . $grp . "</div>";
+        //if ($x==1){$icon_class = ' active ';}
+        $output .= "<div id='icon-" . $key . "' class='triage-step-icon " . $icon_class . "'><i class='fa fa-play fa-2x'></i></div>";
+        $x++;
+      }
+      if (ta_variable_get('triage_progress_extra_step', FALSE, $nid)) {
+        $classes = ' triage-step ';
+        $output .= "<div id='step-0' class='" . $classes . "' style='width:" . $step_width . "%;'>" . $num . ". Legal Issue</div>";
+        $output .= "<div id='icon-0' class='triage-step-icon " . $icon_class . "'><i class='fa fa-play fa-2x'></i></div>";      //$output .= "<div class='triage-step-icon'><i class='fa fa-play'></i></div>";
+        $classes = ' active triage-step last clearfix ';
+        $icon_class = ' active ';
+        $results_text = ta_variable_get('triage_progress_extra_step_text', "Results", $nid);
+        $output .= "<div id='step-last' class='" . $classes . "' style='width:" . $step_width . "%;'>" . ($num + 1) . ". " . $results_text . "</div>";
+        $output .= "<div id='icon-last' class='triage-step-icon " . $icon_class . "'><i class='fa fa-step-forward fa-2x'></i></div>";      //$output .= "<div class='triage-step-icon'><i class='fa fa-play'></i></div>";
+      }
+      else {
+        $classes = ' active triage-step last clearfix ';
+        $output .= "<div id='step-last' class='" . $classes . "' style='width:" . $step_width . "%;'>" . $num . ". Legal Issue</div>";
+        $output .= "<div id='icon-last' class='triage-step-icon " . $icon_class . "'><i class='fa fa-play fa-2x'></i></div>";      //$output .= "<div class='triage-step-icon'><i class='fa fa-play'></i></div>";
+      }
+      $output .= '</div></div>';
+
+    }
+  }
+  // EOF Progress Bar Code
+
+  // Run through the Regions and bundles to put the output together
+
+  foreach ($regions as $region) {
+    $display_ray = array();
+    $output .= "<div class='" . $region . "'>";
+    foreach ($bundles as $bundle) {
+      // Get items for this tid, bundle and region
+      $items = triage_actions_get_by_parent($tid, 0, $bundle, $region);
+      // Assemble the output for the items
+      triage_actions_get_action($items, $output, $tid, $bundle, $region, $display_ray);
+    }
+    if ($use_div_order) {
+      $myorder = array('forms', 'info', 'lawyer','other','court');
+      $score = triage_get_aggregate();
+      $thistypetid = $_SESSION['triage']['triage_kind_of_help'];
+      $thistype = db_query("SELECT description FROM {taxonomy_term_data} WHERE tid = :tid", array(':tid' => $thistypetid))->fetchColumn();
+      switch ($thistype) {
+        case 'forms':
+          if ($score < 0) {
+            $myorder = array('lawyer', 'forms', 'info', 'other','court');
+          }
+          else {
+            $myorder = array('forms', 'info', 'lawyer','other','court');
+          }
+          break;
+        case 'info':
+          if ($score < 0) {
+            $myorder = array('info', 'lawyer', 'forms','other','court');
+          }
+          else {
+            $myorder = array('info', 'forms', 'lawyer','other','court');
+          }
+          break;
+        case 'lawyer':
+          if ($score < 0) {
+            $myorder = array('lawyer', 'info', 'forms','other','court');
+          }
+          else {
+            $myorder = array('forms', 'info', 'lawyer','other','court');
+          }
+          break;
+        default:
+          if ($score < 0) {
+            $myorder = array('info', 'lawyer', 'forms','other','court');
+          }
+          else {
+            $myorder = array('info', 'forms', 'lawyer','other','court');
+          }
+      }
+      foreach ($myorder as $ord) {
+        foreach ($display_ray as $ds) {
+          if ($ds['type'] == $ord) {
+            $output .= $ds['text'];
+          }
+        }
+      }
+      foreach ($display_ray as $ds) {
+        if ($ds['type'] == 'none') {
+          $output .= $ds['text'];
+        }
+      }
+    }
+    $output .= "</div>";
+  }
+  //$output .= "</div>";
+  if ($preview == 3) {
+    $send_to = $_SESSION['triage']['triage_send_to'];
+    if ($send_to > '') {
+      $_SESSION['triage']['triage_email'] = 1;
+      $output = "<div class='site-name'><h3>" . variable_get('site_name') . "</h3></div>" . $output;
+      $msg = "Email to " . $send_to . " failed";
+      mailsystem_set(array(
+        'triage_actions' => 'HTMLMailSystem', // All messages sent by $module.
+      ));
+      $success = triage_actions_mail('default_from', $send_to, 'Help for your legal problem', $output);
+      if ($success) {
+        $msg = "Email to " . $send_to . " was successfully sent";
+      }
+      $_SESSION['triage']['triage_send_to'] = '';
+      drupal_set_message($msg);
+      $cp = arg(0) . "/" . arg(1);
+      drupal_goto($cp);
+    }
+  }
+  $triage_settings = serialize($_SESSION['triage']);
+  $triage_ray = unserialize($triage_settings);
+  $_SESSION['triage_session'] = $triage_settings;
+  if (TRUE) {
+    // Fill in the Triage Log before we go on and set or reset session variables
+    //watchdog('bds_end',$_SESSION['triage']['time_end']);
+    $elig = $_SESSION['triage']['triage_eligibility'];
+    $who = $_SESSION['triage']['triage_who_is'];
+    $thishelp = $_SESSION['triage']['triage_kind_of_help'];
+    $myzip = $_SESSION['triage']['my_zip'];
+    $mycounty = $_SESSION['triage']['my_county'];
+    $mytown = $_SESSION['triage']['my_town'];
+    $mystate = $_SESSION['triage']['my_state'];
+    $mysenior = $_SESSION['triage']['my_senior'];
+    $mylat = $_SESSION['triage']['my_lat'];
+    $mylong = $_SESSION['triage']['my_long'];
+    $mhs = $_SESSION['triage']['my_house_size'];
+    $mhi = $_SESSION['triage']['my_house_income'];
+    $tpp = $_SESSION['triage']['triage_percent_pov'];
+    $period = $_SESSION['triage']['triage_income_period'];
+    $tba = $_SESSION['triage']['triage_bank_amt'];
+    $alone =  $_SESSION['triage']['triage_live_alone'];
+    $tstatus = $_SESSION['triage']['triage_status'];
+    $tgs = $_SESSION['triage']['triage_geo_state'];
+    $nonarea = $_SESSION['triage']['triage_non_service_area'];
+    $ssid = session_id();
+    $hideit = $_SESSION['triage']['triage_hide_popup'];
+    $factors = $_SESSION['triage']['factors'];
+    $currstep = $_COOKIE['triage_current_step'];
+    $completed = $_COOKIE['triage_completed'];
+    $last_step = $_COOKIE['triage_last'];
+    $mytid = $_SESSION['triage']['my_tid'];
+    $chkperiod = $_SESSION['triage']['triage_income_period'];
+    triage_write_history();
+    $_SESSION['triage']['time_start'] = 0;
+    $_SESSION['triage']['time_end'] = 0;
+    $_SESSION['triage']['triage_done_that'] = FALSE;
+    if ($user->uid == 0) {
+      session_destroy();
+      if (!drupal_session_started()) {
+        drupal_session_start();
+      }
+      triage_actions_init();
+      $_SESSION['triage']['triage_ssid'] = $ssid;
+      $_SESSION['triage']['triage_who_is'] = $who;
+      $_SESSION['triage']['triage_kind_of_help'] = $thishelp;
+      $_SESSION['triage']['triage_eligibility'] = $elig;
+      $_SESSION['triage']['factors'] = $factors;
+      $_SESSION['triage']['my_zip'] = $myzip;
+      $_SESSION['triage']['my_county'] = $mycounty;
+      $_SESSION['triage']['my_town'] = $mytown;
+      $_SESSION['triage']['my_state'] = $mystate;
+      $_SESSION['triage']['my_senior'] = $mysenior;
+      $_SESSION['triage']['my_lat'] = $mylat;
+      $_SESSION['triage']['my_long'] = $mylong;
+      $_SESSION['triage']['my_house_size'] = $mhs;
+      $_SESSION['triage']['triage_live_alone'] = $alone;
+      $_SESSION['triage']['my_house_income'] = $mhi;
+      $_SESSION['triage']['my_tid'] = $mytid;
+      $_SESSION['triage']['triage_income_period'] = $period;
+      $_SESSION['triage']['triage_percent_pov'] = $tpp;
+      $_SESSION['triage']['triage_bank_amt'] = $tba;
+      $_SESSION['triage']['triage_status'] = $tstatus;
+      $_SESSION['triage']['triage_geo_state'] = $tgs;
+      $_SESSION['triage']['triage_hide_popup'] = $hideit;
+      $_SESSION['triage']['triage_income_period'] = $chkperiod;
+      $_SESSION['triage']['triage_final_tid'] = $tid;
+      $_SESSION['triage']['triage_non_service_area'] = $nonarea;
+      $_SESSION['triage']['triage_total_steps'] = 0;
+      $_SESSION['triage']['triage_direct_nid'] = 0;
+      $_SESSION['triage']['triage_email'] = 0;
+      setcookie('triage_current_step', 0, time() + (86400 * 30), "/");
+      setcookie('triage_completed', 0, time() + (86400 * 30), "/");
+      setcookie('triage_last', 0, time() + (86400 * 30), "/");
+      triage_clear_log();
+    }
+    $_SESSION['triage']['triage_popup_counter'] = -(variable_get('triage_popup_norepeat', 2));
+  }
+  //dsm($_SESSION);
+  return $output;
+}
+
+function triage_actions_get_by_parent($tid, $pid = 0, $bundle = 'taxonomy', $ta_region = 'ta-main-panel') {
+  global $language;
+  $lang = $language->language;
+  if ($bundle == 'help' || $bundle == 'quest') {
+    $tid = $_SESSION['triage']['triage_page_nid'];
+  }
+  $xquery = db_select('triage_actions', 'ta');
+  $xquery->fields('ta', array('id',));
+  $xquery->condition('ta.entity_id', $tid);
+  $xquery->condition('ta.pid', $pid);
+  $xquery->condition('ta.language', $lang);
+  $xquery->condition('ta.bundle', $bundle);
+  $xquery->condition('ta.region', $ta_region);
+  $xquery->condition('ta.enabled', 1);
+  $xitems = $xquery->execute()->fetchCol();
+
+  $query = db_select('triage_actions', 'ta');
+  $query->fields('ta', array(
+    'title',
+    'bundle',
+    'display_header',
+    'action_text',
+    'extra',
+    'type',
+    'id',
+    'pid',
+    'action_text_format',
+    'node_ref_nid',
+    'node_view_opt',
+    'trim_length',
+    'classes',
+    'region',
+    'show_income',
+    'hide_income',
+    'show_status',
+    'hide_status',
+    'show_county',
+    'hide_county',
+    'show_tax',
+    'hide_tax',
+    'show_benefits',
+    'hide_benefits',
+    'reusable_text',
+    'intake_elig',
+    'weight'
+  ));
+  $query->condition('ta.entity_id', $tid);
+  $query->condition('ta.pid', $pid);
+  $query->condition('ta.language', $lang);
+  $query->condition('ta.bundle', $bundle);
+  $query->condition('ta.region', $ta_region);
+  $query->condition('ta.enabled', 1);
+
+  $subquery = db_select('triage_actions', 'sub');
+  $subquery->fields('sub', array(
+    'title',
+    'bundle',
+    'display_header',
+    'action_text',
+    'extra',
+    'type',
+    'id',
+    'pid',
+    'action_text_format',
+    'node_ref_nid',
+    'node_view_opt',
+    'trim_length',
+    'classes',
+    'region',
+    'show_income',
+    'hide_income',
+    'show_status',
+    'hide_status',
+    'show_county',
+    'hide_county',
+    'show_tax',
+    'hide_tax',
+    'show_benefits',
+    'hide_benefits',
+    'reusable_text',
+    'intake_elig',
+    'weight'
+  ));
+  $subquery->condition('sub.entity_id', $tid);
+  $subquery->condition('sub.pid', $pid);
+  $subquery->condition('sub.language', $lang, '!=');
+  $subquery->condition('sub.bundle', $bundle);
+  $subquery->condition('sub.region', $ta_region);
+  $subquery->condition('sub.enabled', 1);
+  if (count($xitems) > 0) {
+    $subquery->condition('sub.id', $xitems, "NOT IN");
+  }
+  $subquery->orderBy('weight');
+
+  $query->union($subquery, 'UNION ALL');
+  $items = $query->execute();
+  return $items;
+}
+
+function triage_actions_get_action($items, &$output, $tid, $bundle = 'taxonomy', $ta_region = 'ta-main-panel', &$display_ray = NULL) {
+  //Get the underlying Triage Page nid so we can get the right variables
+  $nid = $_SESSION['triage']['triage_page_nid'];
+  $taxparents = array();
+  if ($bundle == 'taxonomy') {
+    $tps = taxonomy_get_parents_all($tid);
+    //dsm($tps);
+    foreach ($tps as $tp) {
+      $taxparents[] = $tp->tid;
+    }
+  }
+  $use_div_order = ta_variable_get('triage_order_action_divs', FALSE, $nid);
+  $triage_nav_type = ta_variable_get('triage_nav_type', 'bottom', $nid);
+  $backtext = ta_variable_get('triage_reset_text', 'Back', $nid);
+  $nexttext = ta_variable_get('triage_next_text', 'Continue', $nid);
+  $preview = $_SESSION['triage']['triage_preview'];
+  $group_status = array_keys($_SESSION['triage']['triage_status']);
+  $county_info = array(trim($_SESSION['triage']['my_county']));
+  $income_status = $_SESSION['triage']['triage_eligibility'];
+  $ben_status = array_keys($_SESSION['triage']['my_benefits']);
+  global $language;
+  $lang = $language->language;
+  $groupid = $_SESSION['triage']['triage_group_id'];
+  $grp_array = db_query("select id from triage_actions 
+                        where bundle=:bundle
+                        and region=:region
+                        and type = 'group'
+                        and entity_id = :entity_id
+                        order by weight", array(
+    ':bundle' => $bundle,
+    ':region' => $ta_region,
+    ':entity_id' => $tid
+  ))->fetchCol();
+  $group_num = count($grp_array);
+  //$first = $grp_array[0];
+  $prev = 0;
+  $next = 0;
+  $itemnum = 0;
+  if ($ta_region == "ta-help-panel") {
+    $bds = '';
+  }
+  foreach ($items as $item) {
+    if ($item->id == '647') {
+      $bds = '';
+    }
+    $nvo = 'teaser';
+    $len = 350;
+    // Visibility Logic
+    if (TRUE) {
+      // Show or hide items by income
+      $show_inc = x_plode(",", $item->show_income);
+      if ($item->node_view_opt > '') {
+        $nvo = $item->node_view_opt;
+      }
+      if ($item->trim_length) {
+        $len = $item->trim_length;
+      }
+      if ($show_inc[0] > 0 && count(array_intersect($income_status, $show_inc)) == 0) {
+        continue;
+      }
+      $hide_inc = x_plode(",", $item->hide_income);
+      if ($hide_inc[0] > 0 && count(array_intersect($income_status, $hide_inc)) !== 0) {
+        continue;
+      }
+      // Show or hide items by status
+      $show_stat = x_plode(",", $item->show_status);
+      if ($show_stat[0] > 0 && count(array_intersect($group_status, $show_stat)) == 0) {
+        continue;
+      }
+      $hide_stat = x_plode(",", $item->hide_status);
+      if ($hide_stat[0] > 0 && count(array_intersect($group_status, $hide_stat)) !== 0) {
+        continue;
+      }
+      // Show or hide items by status
+      $show_ben = x_plode(",", $item->show_benefits);
+      if ($show_ben[0] > 0 && count(array_intersect($ben_status, $show_ben)) == 0) {
+        continue;
+      }
+      $hide_ben = x_plode(",", $item->hide_benefits);
+      if ($hide_ben[0] > 0 && count(array_intersect($ben_status, $hide_ben)) !== 0) {
+        continue;
+      }
+      // Show or hide items by County
+      // Carry default county info on reusables
+      $show_count = x_plode(",", $item->show_county);
+      if ($item->type == 'reuse') {
+        if (!$show_count[0] > '') {
+          $sql = 'select show_county, hide_county 
+              from triage_actions 
+              where id = :id
+              and language = :lang';
+          $act = db_query($sql, array(
+            ':id' => $item->node_ref_nid,
+            ':lang' => $lang
+          ))->fetch();
+          if ($act) {
+            $show_count = x_plode(",", $act->show_county);
+          }
+        }
+      }
+      if ($show_count[0] > '' && count(array_intersect($county_info, $show_count)) == 0) {
+        continue;
+      }
+      // Carry default county info on reusables
+      $hide_count = x_plode(",", $item->hide_county);
+      if ($item->type == 'reuse') {
+        if (!$hide_count[0] > '') {
+          $sql = 'select show_county, hide_county 
+              from triage_actions 
+              where id = :id
+              and language = :lang';
+          $act = db_query($sql, array(
+            ':id' => $item->node_ref_nid,
+            ':lang' => $lang
+          ))->fetch();
+          if ($act) {
+            $hide_count = x_plode(",", $act->hide_county);
+          }
+        }
+      }
+      if ($hide_count[0] > '' && count(array_intersect($county_info, $hide_count)) !== 0) {
+        continue;
+      }
+      // Show or hide items by taxonomy
+      $show_tax = x_plode(",", $item->show_tax);
+      if ($show_tax[0] > '' && count(array_intersect($taxparents, $show_tax)) == 0) {
+        continue;
+      }
+      $hide_tax = x_plode(",", $item->hide_tax);
+      if ($hide_tax[0] > '' && count(array_intersect($taxparents, $hide_tax)) !== 0) {
+        continue;
+      }
+    }
+    // Tell session if we're offering intake, for triage log
+    if ($item->intake_elig) {
+      $_SESSION['triage']['triage_intake_elig'] = 1;
+    }
+    // Get title - use display header if there is one
+    $titl = t(trim($item->title));
+    if (trim($item->display_header) != '') {
+      $titl = t(trim($item->display_header));
+    }
+    if ($item->display_header == '<none>') {
+      $titl = "";
+    }
+    // Process according to item type
+    switch (strtolower($item->type)) {
+      case 'text':
+        //add or remove according to print only status stored in extra field
+        if ($preview == 3 || $preview == 4) {
+          if ($item->extra == 'non_print') {
+            break;
+          }
+        }
+        else {
+          if ($item->extra == 'print_only') {
+            break;
+          }
+        }
+        $class = $item->classes;
+        if ($class == "none") {
+          $output .= "<div class='triage-action-item'>";
+        }
+        else {
+          $output .= "<div class='triage-action-item " . $class . "'>";
+        }
+        if ( trim($titl) > '') {
+          $output .= "<h4>" . $titl . '</h4>';
+        }
+        //$output .= "<p>" . $item->action_text . '</p>';
+        $output .= $item->action_text ;
+        $output .= "</div>";
+        break;
+      case 'form':
+        if ($preview == 3) {
+        }
+        else {
+          if ($item->action_text == 'triage_in_service_area_form') {
+            $_SESSION['triage']['triage_sa_extra'] = $item->extra;
+          }
+          if ($item->action_text == 'triage_suggestion_form') {
+            $max_chars = $item->trim_length;
+            drupal_add_js(array('max_chars' => $max_chars), 'setting');
+          }
+          $form = drupal_get_form($item->action_text);
+          $class = $item->classes;
+          $class = str_replace("none", "", $class);
+          if ($item->action_text == 'triage_print_form') {
+            $class .= ' noprint ';
+          }
+          if ($item->reusable_text) {
+            $class .= " mandatory ";
+          }
+          $output .= "<div class='triage-action-form " . $class . "'>";
+          if (trim($titl) > '') {
+            $output .= "<h4>" . t($titl) . '</h4>';
+          }
+          $output .= render($form);
+          if ($item->action_text == 'triage_print_form') {
+            if (module_exists('twilio') && variable_get('triage_use_sms', FALSE)) {
+              $block = module_invoke('webform', 'block_view', variable_get('triage_sms_block', 'block-webform-client-block-2252'));
+              $output .= render($block['content']);
+            }
+          }
+          $output .= "</div>";
+        }
+        break;
+      case 'func':
+        if ($preview == 3 || $preview == 4) {
+          if ($item->node_view_opt == 'non_print') {
+            break;
+          }
+        }
+        else {
+          if ($item->node_view_opt == 'print_only') {
+            break;
+          }
+        }
+        if ($item->action_text == 'triagequests') {
+          if (!user_access('view user input')) {
+            break;
+          }
+        }
+        $class = $item->classes;
+        if ($class == "none") {
+          $classout = "<div class='triage-action-item'>";
+        }
+        else {
+          $classout = "<div class='triage-action-item " . $class . "'>";
+        }
+        if (trim($titl) > '') {
+          $titleout = "<h4>" . t($titl) . '</h4>';
+        }
+        else {
+          $titleout = '';
+        }
+        switch ($item->action_text) {
+          case 'triagepath':
+            $output .= $classout . $titleout;
+            $output .= triage_showpath($tid);
+            $intro = t(trim($item->extra));
+            $_SESSION['triage']['triage_intro_text'] = t($intro);
+            break;
+          case 'triagequests':
+            if (user_access('view user input')) {
+              $output .= $classout . $titleout;
+              $output .= "<div class='triage-answers'>";
+              $output .= triage_answers($tid);
+              $output .= "</div>";
+            }
+            break;
+          case 'triagedesc':
+            if ($_SESSION['triage']['triage_info'] > '') {
+              $output .= $classout . $titleout;
+              $output .= "<div class='triage-tax_desc'>";
+              $output .= $_SESSION['triage']['triage_info'];
+              $output .= "</div>";
+            }
+            break;
+
+          case 'triage_restart':
+            $output .= $classout . $titleout;
+            $output .= triage_restart();
+            break;
+          case 'triage_language':
+            $output .= '<div class="sl-language">';
+            $output .= '<span class="title">' . t('Select Language') . ': </span>';
+            $block = module_invoke('locale', 'block_view', 'language');
+            $output .= $block['content'];
+            $output .= '</div>';
+            break;
+        }
+        //$output .= "</div>";
+        break;
+      case 'reuse':
+        $sql = 'select title,display_header,action_text, classes, intake_elig 
+                    from triage_actions 
+                    where id = :id
+                    and language = :lang';
+        $act = db_query($sql, array(
+          ':id' => $item->node_ref_nid,
+          ':lang' => $lang
+        ))->fetchAssoc();
+        if (!$act['action_text']) {
+          $sql = 'select title,display_header,action_text, classes, intake_elig  
+                      from triage_actions 
+                      where id = :id';
+          $act = db_query($sql, array(':id' => $item->node_ref_nid))->fetchAssoc();
+        }
+        if ($act['intake_elig']) {
+          $_SESSION['triage']['triage_intake_elig'] = 1;
+        }
+        $titl = $act['title'];
+        if ($act['display_header'] == '<none>') {
+          $titl = "";
+        }
+        if ($item->title > '') {
+          $titl = $item->title;
+        }
+        if ($item->display_header > '') {
+          $titl = $item->display_header;
+        }
+        if ($act['display_header'] > '' && $lang != 'en') {
+          $titl = $act['display_header'];
+        }
+        $class = $item->classes;
+        if ($class == 'inherit' || $class == '' || is_null($class)) {
+          $class = $act['classes'];
+        }
+        if ($class == "none") {
+          $output .= "<div class='triage-action-item'>";
+        }
+        else {
+          $output .= "<div class='triage-action-item " . $class . "'>";
+        }
+        if (trim($titl) > '') {
+          $output .= "<h4>" . $titl . '</h4>';
+        }
+        $output .= "<p>" . $act['action_text'] . '</p>';
+        $output .= "</div>";
+        break;
+      case 'node':
+        $nodeview = $nvo;
+        if (is_null($nvo) || is_int($nvo)) {
+          break;
+        }
+        if (!$item->node_ref_nid){
+          break;
+        }
+        if(in_array($item->node_ref_nid, $_SESSION['triage']['end_nodes'] )){
+          break;
+        }
+        else {
+          $_SESSION['triage']['end_nodes'][] = $item->node_ref_nid;
+        }
+        if ($nvo == 'trim') {
+          $nodeview = 'full';
+        }
+        $node1 = node_load($item->node_ref_nid);
+        //dsm($node1);
+        $translations = translation_node_get_translations($node1->nid);
+        $tnid = null;
+        if (isset($translations[$lang])) {
+          $tnid = $translations[$lang]->nid;
+        }
+        if ($tnid) {
+          $node = node_load($tnid);
+        }
+        else {
+          $node = node_load($item->node_ref_nid);
+        }
+        $build = node_view($node, $nodeview, $lang);
+        if ($nvo == 'trim') {
+          //$txt = strip_tags($build['body'][0]["#markup"]);
+          $config = array(
+            'safe' => 1,
+            'elements' => '-img',
+          );
+          $txt = htmLawed($build['body'][0]["#markup"], $config);
+          //dsm($txt);
+          $txt1 = mb_strimwidth($txt, 0, $len, "...");
+          //dsm($txt1);
+          $build['body'][0]["#markup"] = $txt1;
+
+        }
+        unset($build['links']['blog']);
+        unset($build['links']['comment']);
+        //$build['links']['node']['#links'] = $lnk;
+        $titl = $build['body']['#object']->title;
+        if ($item->display_header > '' && $item->display_header != '<none>') {
+          $titl = $item->display_header;
+        }
+        $build['body']['#object']->title = $titl;
+        unset($build['print_links']);
+        //dsm($build);
+        $class = $item->classes;
+        if ($nvo == 'triage_view_mode') {
+          $class .= ' triage-remove-a ';
+        }
+        if ($class == "none") {
+          $output .= "<div class='triage-action-item'>";
+        }
+        else {
+          $output .= "<div class='triage-action-item " . $class . "'>";
+        }
+        $output .= drupal_render($build);
+        if ($nvo == 'trim') {
+          $output .= "<ul class='links inline'><li class='node-readmore'>" . l('Read More', 'node/' . $item->node_ref_nid) . "</li><ul>";
+        }
+        $output .= "</div>";
+        break;
+      case 'srch':
+        $class = $item->classes;
+        if ($class == "none") {
+          $output .= "<div>";
+        }
+        else {
+          $output .= "<div class='" . $class . "'>";
+        }
+//        if ($titl > ''){
+//          $output .= "<h4>" . $titl . '</h4>';
+//        }
+        $output .= triage_search($tid, $item, $titl);
+        $output .= "</div>";
+        //$output .= "<div class='clear-both'></div>";
+        break;
+      case 'orgsrch':
+        $class = $item->classes;
+        if($item->action_text == "court"){
+          $key = 'court';
+        }
+        else {
+        $key = 'other';
+        $og = x_plode(",",$item->extra);
+        //dsm($og);
+        if (in_array(31,$og)) {
+          $key = 'lawyer';
+        }
+        }
+        $div_out = '';
+        if ($class == "none") {
+          if ($use_div_order) {
+            if ($key > '') {
+              $class = " display-wrapper type-" . $key . " ";
+              $div_out .= "<div class='" . $class . "'>";
+            }
+            else {
+              $div_out .= "<div>";
+            }
+          }
+          else {
+            //$div_out .= "<div>";
+          }
+        }
+        else {
+          $div_out .= "<div class='" . $class . "'>";
+        }
+//        if ($titl > ''){
+//          $output .= "<h4>" . $titl . '</h4>';
+//        }
+        //$output .= triage_orgsearch_sl($tid,$item,$titl);
+        $func = variable_get('triage_search_func', 'triage_orgsearch');
+        if (is_null($func)) {
+          $func = "triage_orgsearch";
+        }
+        $div_out .= $func($tid, $item, $titl, $og);
+        $div_out .= "</div>";
+        if ($use_div_order) {
+          $div_out .= "</div>";
+          if ($key) {
+            $display_ray[] = array(
+              'type' => $key,
+              'text' => $div_out,
+            );
+          }
+          else {
+            //$output .= $div_out;
+            $display_ray[] = array(
+              'type' => 'none',
+              'text' => $div_out,
+            );
+          }
+        }
+        else {
+          $output .= $div_out;
+        }
+
+
+        //$output .= "<div class='clear-both'></div>";
+        break;
+      case 'div':
+        $div_out = '';
+        $key = NULL;
+        $class = $item->classes;
+        $typetid = $item->action_text;
+        if ($typetid > "") {
+          $thistype = db_query('select description from taxonomy_term_data where tid=:tid', array(':tid' => $typetid))->fetchColumn();
+          $thistype = strtolower(str_replace(" ", "-", $thistype));
+          if($thistype) {
+          if ($class == "none") {
+            $class = "  display-wrapper  type-" . $thistype . " ";
+          }
+          else {
+            $class .= "  display-wrapper type-" . $thistype . " ";
+          }
+        }
+        }
+
+        if ($class == "none") {
+          $div_out .= "<div class=' display-wrapper '>";
+        }
+        else {
+          $div_out .= "<div class='" . $class . "'>";
+        }
+        if ($typetid) {
+          $key = taxonomy_term_load($typetid)->description;
+        }
+        if ( trim($titl) > '') {
+          $div_out .= "<h4>" . $titl . '</h4>';
+        }
+        $ditems = triage_actions_get_by_parent($tid, $item->id, $bundle, $ta_region);
+        triage_actions_get_action($ditems, $div_out, $tid, $bundle, $ta_region);
+        $div_out .= "</div>";
+        //$output .= $div_out;
+        if ($use_div_order) {
+          if ($key) {
+            $display_ray[] = array(
+              'type' => $key,
+              'text' => $div_out,
+            );
+          }
+          else {
+            $display_ray[] = array(
+              'type' => 'none',
+              'text' => $div_out,
+            );
+          }
+        }
+        else {
+          $output .= $div_out;
+        }
+        break;
+      case 'group':
+        $next = 'next-0 ';
+        $prev = 'prev-0 ';
+        $grp = 'grp-' . $item->id;
+        if ($itemnum > 0) {
+          $prev = 'prev-' . $grp_array[($itemnum - 1)] . " ";
+        }
+        if ($itemnum < $group_num - 1) {
+          $next = 'next-' . $grp_array[($itemnum + 1)] . " ";
+        }
+        $class = $item->classes;
+        if ($class == "none") {
+          if ($itemnum == 0) {
+            $output .= "<div class='triage-group " . $grp . " '>";
+          }
+          else {
+            $output .= "<div class='triage-group hidden " . $grp . " '>";
+          }
+        }
+        else {
+          if ($itemnum == 0) {
+            $output .= "<div class='triage-group " . $class . " " . $grp . " '>";
+            if (trim($titl) > '') {
+              $output .= "<h4>" . $titl . '</h4>';
+            }
+          }
+          else {
+            $output .= "<div class='triage-group hidden " . $class . " " . $grp . " '>";
+            if (trim($titl) > '') {
+              $output .= "<h4>" . $titl . '</h4>';
+            }
+          }
+        }
+        $itemnum++;
+        $regions = array(
+          'ta-message-panel',
+          'ta-main-panel',
+          'ta-help-panel',
+          'ta-bottom-panel'
+        );
+        foreach ($regions as $region) {
+          $output .= "<div class='" . $region . "'>";
+          $pitems = triage_actions_get_by_parent($tid, $item->id, 'node', $region);
+          triage_actions_get_action($pitems, $output, $tid, "node");
+          $output .= "</div>";
+        }
+        if ($triage_nav_type == 'bottom') {
+          $output .= "<div class='ta-nav-bar'>";
+        }
+        if ($triage_nav_type == 'split' && $prev != 'prev-0 ') {
+          $lefticon = '<i class="fa ' .
+            ta_variable_get('triage_reset_left_icon', '', $nid) . '"></i>';
+          $righticon = '<i class="fa ' .
+            ta_variable_get('triage_reset_right_icon', '', $nid) . '"></i>';
+
+          $output .= "<div class='triage-group-reset " . $prev . "'>" .
+            $lefticon . ' ' . t($backtext) . ' ' . $righticon . "</div>";
+          $output .= "<hr />";
+        }
+        $submit_class = "triage-group-submit " . $next;
+        if ($triage_nav_type == 'bottom' && $prev != 'prev-0 ') {
+          $lefticon = '<i class="fa ' .
+            ta_variable_get('triage_reset_left_icon', '', $nid) . '"></i>';
+          $righticon = '<i class="fa ' .
+            ta_variable_get('triage_reset_right_icon', '', $nid) . '"></i>';
+          //if(ta_variable_get('triage_custom_css','',$nid)>""){$lefticon='';$righticon='';}
+          $output .= "<div class='triage-group-reset " . $prev . "'>" .
+            $lefticon . ' ' . t($backtext) . ' ' . $righticon . "</div>";
+        }
+        if ($triage_nav_type == 'split') {
+          $output .= "<div class='ta-nav-bar2'>";
+        }
+        $sublefticon = '<i class="fa ' .
+          ta_variable_get('triage_submit_left_icon', '', $nid) . '"></i>';
+        $subrighticon = '<i class="fa ' .
+          ta_variable_get('triage_submit_right_icon', '', $nid) . '"></i>';
+        //if(ta_variable_get('triage_custom_css','',$nid)>""){$sublefticon='';$subrighticon='';}
+        $output .= "<div class='" . $submit_class . "'>" .
+          $sublefticon . ' ' . t($nexttext) . ' ' . $subrighticon . "</div>";
+        //$output .= "<div class='" . $submit_class . "'>" . t($nexttext) . "</div>";
+        $output .= "</div>";
+        //if ($triage_nav_type=='bottom'){
+        $output .= "</div>";
+        //}
+
+        break;
+    }
+  }
+}
+
+function triage_actions($tid = 0, $bundle = 'taxonomy') {
+  $_SESSION['triage']['edit_tid'] = $tid;
+  $_SESSION['triage']['my_bundle'] = $bundle;
+  $form = drupal_get_form('triage_actions_manage');
+  return render($form);
+}
+
+// Custom array sort function by weight.
+function _triage_actions_arraysort($a, $b) {
+  if (isset($a['weight']) && isset($b['weight'])) {
+    return $a['weight'] < $b['weight'] ? -1 : 1;
+  }
+  return 0;
+}
+
+// Theme function for triage_actions_manage().
+function theme_triage_actions_manage($variables) {
+  //dsm($variables);
+  $_SESSION['triage']['triage_return_to'] = current_path();
+  $my_return = array('path' => current_path());
+  drupal_add_js(array('my_return' => $my_return), 'setting');
+  global $base_url;
+  $output = '';
+  $bundle = $_SESSION['triage']['my_bundle'];
+  if ($bundle == 'taxonomy') {
+    $term = taxonomy_term_load($_SESSION['triage']['edit_tid']);
+    if($term->name) {
+    $output .= "<h4>" . $term->name . "</h4>";
+    }
+    $node = triage_get_page($term->vid);
+  }
+  else {
+    $output = "<div class ='triage_action_groups";
+    $node = node_load($_SESSION['triage']['edit_tid']);
+    if ($node) {
+    $output .= "<h4>" . $node->title . "</h4>";
+  }
+  }
+//  $myform = drupal_get_form('triage_clone_divs_form');
+//  $output .= render($myform);
+  $_SESSION['triage']['triage_page_nid'] = $node->nid;
+  $_SESSION['triage']['triage_state_id'] = ta_variable_get('triage_state', '', $node->nid);
+  $form = $variables['form'];
+  //dsm($form);
+  $rows = array();
+  foreach (element_children($form['items']) as $id) {
+    $label = "Edit";
+    $actid = $form['items'][$id]['id']['#value'];
+    if ($actid == 0) {
+      $label = "Add";
+    }
+    $type = $form['items'][$id]['type']['#value'];
+    //dsm($type);
+    $form['items'][$id]['weight']['#attributes']['class'] = array('triage-order-weight');
+    $form['items'][$id]['id']['#attributes']['class'] = array('triage-order-id');
+    $form['items'][$id]['pid']['#attributes']['class'] = array('triage-order-pid');
+
+    $indent = theme('indentation', array('size' => $form['items'][$id]['depth']['#value']));
+    unset($form['items'][$id]['depth']);
+    //unset($form['items'][$id]['edit']);
+    $class = array('draggable');
+    // We can add the 'tabledrag-root' class to a row in order to indicate
+    // that the row may not be nested under a parent row.  In our sample data
+    // for this example, the description for the item with id '8' flags it as
+    // a 'root' item which should not be nested.
+    if (in_array($form['items'][$id]['type']['#value'], array('group'))) {
+      $class[] = 'tabledrag-root';
+    }
+
+    // We can add the 'tabledrag-leaf' class to a row in order to indicate
+    // that the row may not contain child rows.  In our sample data for this
+    // example, the description for the item with id '9' flags it as a 'leaf'
+    // item which can not contain child items.
+    if (in_array($form['items'][$id]['type']['#value'], array(
+      'text',
+      'reuse'
+    ))) {
+      $class[] = 'tabledrag-leaf';
+    }
+    if (in_array($form['items'][$id]['type']['#value'], array('text'))
+      && !in_array($form['items'][$id]['id']['#value'], array(0))
+    ) {
+      //$addbutton = drupal_render($form['items'][$id]['translate']);
+      $class2 = "class='transbutton3' title='Translations incomplete - click to add translations'";
+      if (triage_actions_trans2complete($actid)) {
+        $class2 = "class='transbutton3 transcomplete' title='Click to edit existing translations'";
+      }
+      $addbutton = "<a " . $class2 . " href='" . $base_url . "/triage_actions_translate/" . $actid . "'>Translate</a>";
+      unset($form['items'][$id]['translate']);
+    }
+    else {
+      $addbutton = "";
+      unset($form['items'][$id]['translate']);
+    }
+    $editbutton = "<a href='" . $base_url . "taxonomy/actions/" . $actid . "/" . $type . "/edit'>" . $label . "</a>";
+    $rows[] = array(
+      'data' => array(
+        $indent . drupal_render($form['items'][$id]['title']),
+        drupal_render($form['items'][$id]['region']),
+        drupal_render($form['items'][$id]['type']),
+        drupal_render($form['items'][$id]['enabled']),
+        drupal_render($form['items'][$id]['weight']),
+        drupal_render($form['items'][$id]['id']),
+        drupal_render($form['items'][$id]['pid']),
+        $addbutton,
+        //$editbutton,
+        drupal_render($form['items'][$id]['edit']),
+        drupal_render($form['items'][$id]['remove']),
+
+      ),
+      'class' => $class,
+    );
+  }
+
+  //$header = array( t('Title'), t('Type'), t('Weight'), array('data' => t('Operations'), 'colspan' => 4));
+  $header = array(
+    t('Title'),
+    t('Region'),
+    t('Type'),
+    t('Enabled'),
+    t('Weight'),
+    array('data' => t('Operations'), 'colspan' => 8),
+  );
+  $output .= "<div id='triage-actions'>";
+  $output .= theme('table', array(
+    'header' => $header,
+    'rows' => $rows,
+    'attributes' => array('id' => 'triage-order')
+  ));
+  $output .= drupal_render_children($form) . "</div>";
+  if ($bundle == 'node') {
+    $output .= "</div>";
+  }
+  drupal_add_tabledrag('triage-order', 'match', 'parent', 'triage-order-pid', 'triage-order-pid', 'triage-order-id', TRUE);
+  drupal_add_tabledrag('triage-order', 'order', 'sibling', 'triage-order-weight');
+  //$output .= "<a class='formbutton' href='" . $base_url . "/triage_actions_preview'>Preview</a>";
+  return $output;
+}
+
+function triage_actions_admin() {
+  $_SESSION['triage']['triage_return_to'] = current_path();
+  $vid = $_SESSION['triage']['triage_actions_admin_voc'];
+  $parent = $_SESSION['triage']['triage_actions_admin_parent'];
+
+  $output = '<h1>Triage Action Administration</h4>';
+  $form = drupal_get_form('triage_action_admin_actions_form');
+  $output .= drupal_render($form);
+  if ($parent > 0) {
+    $par = taxonomy_term_load($parent);
+    $output .= '<h4>' . $par->name . "</h4>";
+  }
+  $voc = taxonomy_vocabulary_load($vid);
+  $tree = triage_get_nested_tree($vid, NULL, $parent);
+  $rtree = triage_nested_tree_render($tree);
+  $output .= render($rtree);
+  return $output;
+}
+
+function triage_actions_reusable_admin() {
+  $vid = $_SESSION['triage']['triage_actions_admin_voc'];
+  $_SESSION['triage']['triage_return_to'] = current_path();
+  $key = $_SESSION['triage']['triage_reusable_filter'];
+  global $language;
+  global $base_url;
+  $node = triage_get_page($vid);
+  $nid = $node->nid;
+  $lang = $language->language;
+  $default_lang = language_default('language');
+  $parent = $_SESSION['triage']['triage_actions_admin_parent'];
+  $output = "<div>";
+  //$output .= '<h4>Triage Reusable Text Editor</h4>';
+  $form = drupal_get_form('triage_action_admin_reuse_form');
+  $output .= drupal_render($form);
+  $output .= "</div>";
+  $sub1 = db_select('taxonomy_term_data', 't');
+  $sub1->addField('t', 'tid', 'entity_id');
+  $sub1->condition('t.vid', $vid);
+//  $sub2 = db_select('field_data_field_triage_tree', 'n');
+//  $sub2->addField('n', 'entity_id');
+//  $sub2->condition('n.field_triage_tree_value', $vid);
+  $db_or = db_or();
+  $db_or->condition('ta.entity_id', $sub1, "IN");
+  $db_or->condition('ta.entity_id', $nid);
+  $db_or->condition('ta.entity_id', 0);
+  $query = db_select('triage_actions', 'ta');
+  $query->fields('ta', array('id', 'title', 'action_text', 'reusable_text'));
+  $query->condition('type', 'text')
+    ->condition('language', $default_lang)
+    ->condition($db_or)
+    ->orderBy('title');
+  if ($_SESSION['triage']['triage_reusable_text_only']) {
+    $query->condition('reusable_text', 1);
+  }
+  if (trim($key) > '') {
+    $db_or2 = db_or();
+    $db_or2->condition('action_text', "%" . $key . "%", 'LIKE');
+    $db_or2->condition('title', "%" . $key . "%", 'LIKE');
+    $query->condition($db_or2);
+  }
+  watchdog('bds',dpq_triage($query,TRUE));
+  $acts = $query->execute();
+  $rows = array();
+  foreach ($acts as $act) {
+    $icon = '';
+    $class = "class='transbutton2' title='Translations incomplete - click to add translations'";
+    if (triage_actions_trans2complete($act->id)) {
+      $class = "class='transbutton2 transcomplete' title='Click to edit existing translations'";
+    }
+    if ($act->reusable_text) {
+      $icon = '<i class="fa fa-cog triage_action_red_text" title="Reusable Text"></i> ';
+    }
+
+    $rows[] = array(
+      $icon,
+      $act->title,
+      substr(strip_tags($act->action_text), 0, 300),
+      "<a href='taxonomy/actions/" . $act->id . "/text/edit'>Edit</a>",
+      "<a href='triage_actions_delete/" . $act->id . "/1'>Delete</a>",
+      "<a " . $class . " href='" . $base_url . "/triage_actions_translate/" . $act->id . "'>Translate</a>",
+    );
+  }
+  $header = array(
+    '',
+    t('Title'),
+    t('Text'),
+    t('Edit'),
+    t('Delete'),
+    t('Translate')
+  );
+  $output .= "<div id='triage-actions'>";
+  $output .= theme('table', array(
+    'header' => $header,
+    'rows' => $rows,
+    'attributes' => array('id' => 'reusable-text')
+  ));
+  $output .= "</div>";
+  return $output;
+}
+
+function triage_get_nested_tree($vid_or_terms = array(), $max_depth = NULL, $parent = 0, $parents_index = array(), $depth = 0) {
+  if (!is_array($vid_or_terms)) {
+    $vid_or_terms = taxonomy_get_tree($vid_or_terms, $parent);
+  }
+  foreach ($vid_or_terms as $term) {
+    foreach ($term->parents as $term_parent) {
+      //dsm($term);
+      if ($term_parent == $parent) {
+        $return[$term->tid] = $term;
+      }
+      else {
+        $parents_index[$term_parent][$term->tid] = $term;
+      }
+    }
+    $thisterm = taxonomy_term_load($term->tid);
+    if ($thisterm) {
+      $vocab = taxonomy_vocabulary_load($thisterm->vid);
+      $voc_name = $vocab->machine_name;
+      $fld = 'field_triage_ref_' . $voc_name;
+      $field = field_get_items('taxonomy_term', $thisterm, $fld);
+      if ($field) {
+        $addtid = $field[0]['tid'];
+      }
+    }
+  }
+  foreach ($return as &$term) {
+    if (isset($parents_index[$term->tid]) && (is_null($max_depth) || $depth < $max_depth)) {
+      $term->children = triage_get_nested_tree($parents_index[$term->tid], $max_depth, $term->tid, $parents_index, $depth + 1);
+    }
+  }
+  return $return;
+}
+
+function triage_nested_tree_render($tree, $recurring = FALSE) {
+  global $base_url;
+  $items = array();
+  if (count($tree)) {
+    foreach ($tree as $term) {
+      $addtid = '';
+      $addterm = NULL;
+      $addname = '';
+      $thisterm = taxonomy_term_load($term->tid);
+      if ($thisterm) {
+        $vocab = taxonomy_vocabulary_load($term->vid);
+        $machine_name = $vocab->machine_name;
+        $fld = 'field_triage_ref_' . $machine_name;
+        $field = field_get_items('taxonomy_term', $thisterm, $fld);
+        if ($field) {
+          $addtid = $field[0]['tid'];
+          $addterm = taxonomy_term_load($addtid);
+          $addname = $addterm->name;
+        }
+      }
+      $pbutton = '';
+      $tx = taxonomy_get_parents($term->tid);
+      $has_children = count(taxonomy_get_children($term->tid));
+      //dsm($tx);
+      $class = '';
+      $class2 = "class='transbutton' title='Translations incomplete - click to add translations'";
+      $class3 = "class='preview-button' title='click for Preview'";
+      $text = 'T';
+      $path = $base_url . '/taxonomy/term/' . $term->tid . '/actions';
+      $tpath = $base_url . '/taxonomy/term/' . $term->tid . '/translate';
+      $ppath = $base_url . '/triage_actions_process/' . $term->tid . '/2';
+      $title = '';
+      if (triage_actions_has_actions($term->tid) || $addname > '') {
+        if ($addname > '') {
+          $class = "has-reference";
+          $title = $addterm->tid . " - " . $addname;
+        }
+        else {
+          $class = "has-actions";
+        }
+        $pbutton = '<a ' . $class3 . '" href="' . $ppath . '">&#xf06e;</a>';
+      }
+      if ($has_children) {
+        $path = $base_url . '/taxonomy/term/' . $term->tid . '/edit';
+      }
+      if (triage_actions_transcomplete($term->tid)) {
+        $class2 = "class='transbutton transcomplete' title='Click to edit existing translations'";
+      }
+      if ($tx == NULL) {
+        $item = array('data' => '<a class="' . $class . '" href ="' . $path . '">' . $term->name . '</a>');
+      }
+      else {
+        $tbutton = '<a ' . $class2 . '" href="' . $tpath . '">' . $text . '</a>';
+        $item = array('data' => $pbutton . $tbutton . '<a class="' . $class . '" title="' . $title . '" href ="' . $path . '">' . $term->name . '</a>');
+      }
+      if (isset($term->children)) {
+        $item["children"] = triage_nested_tree_render($term->children, TRUE);
+      }
+      $items[] = $item;
+    }
+  }
+  $bds = '';
+  if ($recurring) {
+    return $items;
+  }
+  return array(
+    '#theme' => 'item_list',
+    '#items' => $items,
+    '#attributes' => array('class' => 'taxonomy-tree'),
+  );
+}
+
+function triage_actions_has_actions($tid) {
+  $ret = FALSE;
+  $items = db_query('select id from triage_actions where entity_id = :entity_id', array(':entity_id' => $tid))->fetchCol();
+  if (count($items) > 0) {
+    $ret = TRUE;
+  }
+  return $ret;
+}
+
+function triage_actions_parent_get_data($bundle, $this_tid) {
+  // Get all 'root node' items (items with no parents), sorted by weight.
+  global $language;
+  $lang = $language->language;
+
+  if ($bundle == 'taxonomy') {
+    $query = db_select('triage_actions', 'ta');
+    $query->fields('ta', array(
+      'id',
+      'region',
+      'type',
+      'pid',
+      ' title',
+      'weight',
+      'action_text',
+      'node_ref_nid',
+      'language',
+      'enabled',
+    ));
+    $query->innerJoin('taxonomy_term_data', 'td', 'td.tid=ta.entity_id');
+    $query->condition('td.tid', $this_tid)
+      ->condition('ta.bundle', $bundle)
+      ->condition('ta.pid', 0)
+      ->condition('ta.language', $lang)
+      ->orderBy('ta.weight', 'ASC');
+  }
+  else {
+    $query = db_select('triage_actions', 'ta');
+    $query->fields('ta', array(
+      'id',
+      'region',
+      'type',
+      'pid',
+      'title',
+      'weight',
+      'action_text',
+      'node_ref_nid',
+      'language',
+      'enabled,'
+    ));
+    $query->innerJoin('node', 'n', 'n.nid=ta.entity_id');
+    $query->condition('n.nid', $this_tid)
+      ->condition('ta.bundle', $bundle)
+      ->condition('ta.pid', 0)
+      ->condition('ta.language', $lang)
+      ->orderBy('ta.weight', 'ASC');
+  }
+//  dsm(triage_dpq($query));
+  $rootnodes = $query->execute()->fetchAll();
+  // Initialize a variable to store our ordered tree structure.
+  $itemtree = array();
+  // Depth will be incremented in our _get_tree() function for the first
+  // parent item, so we start it at -1.
+  $depth = -1;
+  // Loop through the root nodes, and add their trees to the array.
+  foreach ($rootnodes as $parent) {
+    triage_actions_get_tree($parent, $itemtree, $depth, $bundle, $this_tid);
+  }
+  return $itemtree;
+}
+
+/**
+ * Recursively adds to the $itemtree array, ordered by parent/child/weight.
+ *
+ * @ingroup tabledrag_example
+ */
+function triage_actions_get_tree($parentitem, &$itemtree = array(), &$depth = 0, $bundle, $this_tid) {
+  // Increase our $depth value by one.
+  $depth++;
+  // Set the current tree 'depth' for this item, used to calculate indentation.
+  $parentitem->depth = $depth;
+  // Add the parent item to the tree.
+  $itemtree[$parentitem->id] = $parentitem;
+  // Retrieve each of the children belonging to this parent.
+  if ($bundle == 'taxonomy') {
+    $query = db_select('triage_actions', 'ta');
+    $query->fields('ta', array(
+      'id',
+      'region',
+      'type',
+      'pid',
+      ' title',
+      'weight',
+      'action_text',
+      'language',
+      'enabled',
+    ));
+    $query->innerJoin('taxonomy_term_data', 'td', 'td.tid=ta.entity_id');
+    $query->condition('td.tid', $this_tid)
+      ->condition('ta.bundle', $bundle)
+      ->condition('ta.pid', $parentitem->id)
+      ->orderBy('ta.weight', 'ASC');
+  }
+  else {
+    $query = db_select('triage_actions', 'ta');
+    $query->fields('ta', array(
+      'id',
+      'region',
+      'type',
+      'pid',
+      ' title',
+      'weight',
+      'action_text',
+      'language',
+      'enabled',
+    ));
+    $query->innerJoin('node', 'n', 'n.nid=ta.entity_id');
+    $query->condition('n.nid', $this_tid)
+      ->condition('ta.bundle', $bundle)
+      ->condition('ta.pid', $parentitem->id)
+      ->orderBy('ta.weight', 'ASC');
+  }
+//  dsm(triage_dpq($query));
+  $children = $query->execute()->fetchAll();
+  foreach ($children as $child) {
+    // Make sure this child does not already exist in the tree, to avoid loops.
+    if (!in_array($child->id, array_keys($itemtree))) {
+      // Add this child's tree to the $itemtree array.
+      triage_actions_get_tree($child, $itemtree, $depth, $bundle, $this_tid);
+    }
+  }
+  // Finished processing this tree branch.  Decrease our $depth value by one
+  // to represent moving to the next branch.
+  $depth--;
+}
+
+function triage_actions_transcomplete($tid) {
+  $langs = i18n_element_language_select();
+  $default_lang = language_default('language');
+  $opts = array_keys($langs['#options']);
+  $key = array_search('und', $opts);
+  unset($opts[$key]);
+  $key = array_search($default_lang, $opts);
+  unset($opts[$key]);
+  foreach ($opts as $opt) {
+    $find = NULL;
+    $key = $opt;
+    $lang = $langs['#options'][$opt];
+    $lid = db_query("select lid from i18n_string 
+                      where type = 'term'   
+                      and objectid = :id", array(':id' => $tid))->fetchColumn();
+    // see if action exists for this language
+    $find = db_query('select lid from locales_target where lid = :id and language = :lang', array(
+      ':id' => $lid,
+      ':lang' => $key
+    ))->fetchColumn();
+    if (!$find) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+function triage_actions_trans2complete($id) {
+  $langs = i18n_element_language_select();
+  $default_lang = language_default('language');
+  $opts = array_keys($langs['#options']);
+  $key = array_search('und', $opts);
+  unset($opts[$key]);
+  $key = array_search($default_lang, $opts);
+  unset($opts[$key]);
+  foreach ($opts as $opt) {
+    $find = NULL;
+    $key = $opt;
+    $lang = $langs['#options'][$opt];
+    $find = db_query('select id from triage_actions 
+      where id = :id
+      and language = :lang', array(
+      ':id' => $id,
+      ':lang' => $key
+    ))->fetchColumn();
+    if (!$find) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+function x_plode($delim, $str) {
+  if (strpos($str, $delim) == FALSE && trim($str) > "") {
+    return array($str);
+  }
+  return explode($delim, $str);
+}
+
+function in_array_r($needle, $haystack) {
+  $found = FALSE;
+  foreach ($haystack as $item) {
+    if ($item === $needle) {
+      $found = TRUE;
+      break;
+    }
+    elseif (is_array($item)) {
+      $found = in_array_r($needle, $item);
+      if ($found) {
+        break;
+      }
+    }
+  }
+  return $found;
+}
+
+function triage_showpath($tid) {
+  $out = "<div class='triage-path'>";
+  $out .= "<div class='triage-path-content clearfix'>";
+  $breadcrumb = triage_crumb($tid, FALSE, TRUE);
+  $parents = taxonomy_get_parents_all($tid);
+  $parents = array_reverse($parents);
+  if (!isset($parents[0])) {
+    return '';
+  }
+  $thistid = $parents[0]->tid;
+  $term = taxonomy_term_load($thistid);
+  if (module_exists('i18n_taxonomy') && $term) { //To not break your site if module is not installed
+    $term = i18n_taxonomy_localize_terms($term); // The important part!
+  }
+  $image = field_get_items('taxonomy_term', $term, 'field_icon');
+  $out .= "<div class='ta-answers-left'>";
+  $out .= "<div class='triage-category'>" . t('Legal Category') . "</div>";
+  if ($image) {
+    $img = field_view_value('taxonomy_term', $term, 'field_icon', $image[0]);
+    if (count($img) > 0) {
+      $out .= "<div class='triage-image'>" . render($img) . "</div>";
+    }
+  }
+  $out .= "<div class='triage-title'>" . t($breadcrumb[0]) . "</div></div>";
+  unset($breadcrumb[0]);
+  $out .= "<div class='ta-answers-right'>";
+  $intro = t($_SESSION['triage']['triage_intro_text']);
+  if (!empty($intro)) {
+    $out .= t($intro);
+  }
+  $out .= "<ul>";
+  foreach ($breadcrumb as $crumb) {
+    $out .= "<li>" . $crumb . "</li>";
+  }
+  $out .= "</ul>";
+  $out .= "</div></div></div>";
+  return $out;
+}
+
+function triage_answers($tid, $nopov = FALSE) {
+  $form_opts = array(
+    'none' => 'None',
+    'triage_zip_form' => 'Zip Code or Town',
+    'triage_senior_form' => 'Older than 60',
+    'triage_pov_form' => 'Income Info',
+    'triage_bank_form' => 'Bank Account',
+    'triage_status_form' => 'Status or Group',
+  );
+  $out = '';
+  $pov = triage_percent_pov();
+  //$out .= "TID: " . $tid . "<br />";
+  if (triage_is_form_used('triage_zip_form')) {
+    $out .= "Zipcode: " . $_SESSION['triage']['my_zip'] . "<br />";
+    $out .= "County: " . $_SESSION['triage']['my_county'] . "<br />";
+    $out .= "Town: " . $_SESSION['triage']['my_town'] . "<br />";
+    $out .= "State: " . $_SESSION['triage']['my_state'] . "<br />";
+//    $out .= "Lat: " . $_SESSION['triage']['my_lat'] . "<br />";
+//    $out .= "Long: " . $_SESSION['triage']['my_long'] . "<br />";
+  }
+  if (triage_is_form_used('triage_location_form')) {
+    $out .= "County: " . $_SESSION['triage']['my_county'] . "<br />";
+    $kind = $_SESSION['triage']['triage_kind_of_help'];
+    $help = db_query('select name from taxonomy_term_data where tid = :tid', array(':tid' => $kind))->fetchColumn();
+    if ($help) {
+      $out .= "I am looking for : " . $help . "<br />";
+    }
+  }
+  if (triage_is_form_used('triage_pov_form') || triage_is_form_used('triage_income_form')) {
+    $txt = $_SESSION['triage']['triage_income_period'];
+    $out .= "Household Size: " . $_SESSION['triage']['my_house_size'] . "<br />";
+    $out .= $txt . " Income: " . $_SESSION['triage']['my_house_income'] . "<br />";
+    if (user_is_logged_in() && !$nopov) {
+      $out .= "Percent of Poverty: " . $pov . "%<br />";
+    }
+  }
+  if (triage_is_form_used('triage_bank_form')) {
+    $out .= "Bank Account Total: " . $_SESSION['triage']['triage_bank_amt'] . "<br />";
+  }
+  if (triage_is_form_used('triage_status_form')) {
+    $vals = $_SESSION['triage']['triage_status'];
+    if (count($vals) > 0) {
+      $sql = 'select name from taxonomy_term_data where tid in (' . implode(",", $vals) . ')';
+      $vTypes = db_query($sql)->fetchCol();
+      if (count($vTypes) > 0) {
+        $out .= "Status Checks:<br />";
+      }
+      foreach ($vTypes as $stat) {
+        $out .= '&nbsp&nbsp&nbsp' . $stat . "<br />";
+      }
+    }
+    if (triage_is_form_used('triage_income_form')) {
+      $vals = $_SESSION['triage']['my_benefits'];
+      if (count($vals) > 0) {
+        $sql = 'select name from taxonomy_term_data where tid in (' . implode(",", $vals) . ')';
+        $vTypes = db_query($sql)->fetchCol();
+        if (count($vTypes) > 0) {
+          $out .= "Public Benefits:<br />";
+        }
+        foreach ($vTypes as $stat) {
+          $out .= '&nbsp&nbsp&nbsp' . $stat . "<br />";
+        }
+        if (user_is_logged_in() && !$nopov) {
+          $score = triage_get_aggregate();
+          $out .= "Aggregate Value: " . $score . "<br />";
+        }
+      }
+    }
+  }
+  return $out;
+}
+
+function triage_is_form_used($formname) {
+//  $vid=$_SESSION['triage']['triage_current_voc'];
+//  $sql = "select entity_id 
+//              from field_data_field_triage_tree
+//              where field_triage_tree_value = :vid";
+//  $tid = db_query($sql,array(':vid'=>$vid))->fetchColumn();
+  $nid = $_SESSION['triage']['triage_page_nid'];
+  if (is_null($nid)){
+    if(variable_get('triage_use_popup',0)){
+      $voc = variable_get('triage_default_voc','');
+      $thisvid = taxonomy_vocabulary_machine_name_load($voc)->vid;
+      $tp_node = triage_get_page($thisvid);
+      $nid = $tp_node->nid;
+    }
+  }
+  $sql = "select id from triage_actions where action_text = :form and entity_id = :nid";
+  $id = db_query($sql, array(
+    ':form' => $formname,
+    ':nid' => $nid
+  ))->fetchColumn();
+  if ($id) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+function triage_actions_mail($from = 'default_from', $to, $subject, $message) {
+  $my_module = 'triage_actions';
+  $my_mail_token = microtime();
+  if ($from == 'default_from') {
+    // Change this to your own default 'from' email address.
+    $from = variable_get('site_mail', 'brian@bdsworks.org');
+  }
+  $message = array(
+    'id' => $my_module . '_' . $my_mail_token,
+    'to' => $to,
+    'subject' => $subject,
+    'body' => array($message),
+    'headers' => array(
+      'From' => $from,
+      'Sender' => $from,
+      'Return-Path' => $from,
+    ),
+  );
+  $system = drupal_mail_system($my_module, $my_mail_token);
+  $message = $system->format($message);
+  if ($system->mail($message)) {
+    return TRUE;
+  }
+  else {
+    return FALSE;
+  }
+}
+
+function triage_search($tid = 0, $item, $titl = '') {
+  $output = '';
+  $nvo = 'teaser';
+  $len = 350;
+  $types = explode(",", $item->action_text);
+  if ($item->node_view_opt > '') {
+    $nvo = $item->node_view_opt;
+  }
+  $tbl = variable_get('triage_search_field', '');
+  $fld = $tbl . "_tid";
+  if ($tbl == '') {
+    return '';
+  }
+  $tbl = 'field_data_' . $tbl;
+  $query = db_select('node', 'n');
+  $query->addField('n', 'nid');
+  $query->innerJoin($tbl, 't', 't.entity_id=n.nid');
+  $query->condition('t.' . $fld, $tid);
+  if (count($types) > 0) {
+    $query->condition('n.type', ($types), "IN");
+  }
+  $results = $query->execute()->fetchCol();
+
+  $nodeview = $nvo;
+  if (is_null($nvo) || is_int($nvo)) {
+    $nodeview = 'teaser';
+  }
+  if ($nvo == 'trim') {
+    $nodeview = 'full';
+  }
+  foreach ($results as $nid) {
+    if(in_array($nid, $_SESSION['triage']['end_nodes'] )){
+      continue;
+    }
+    else {
+      $_SESSION['triage']['end_nodes'][] = $nid;
+    }
+    $node = node_load($nid);
+    $build = node_view($node, $nodeview);
+    if ($nvo == 'trim') {
+      //$txt = strip_tags($build['body'][0]["#markup"]);
+      $config = array(
+        'safe' => 1,
+        'elements' => '-img',
+      );
+      $txt = htmLawed($build['body'][0]["#markup"], $config);
+      //dsm($txt);
+      $txt1 = mb_strimwidth($txt, 0, $len, "...");
+      //dsm($txt1);
+      $build['body'][0]["#markup"] = $txt1;
+
+    }
+    unset($build['links']['blog']);
+    unset($build['links']['comment']);
+    //$build['links']['node']['#links'] = $lnk;
+    $build['body']['#object']->title = $node->title;
+    unset($build['print_links']);
+    //dsm($build);
+    $class = $item->classes;
+    if ($nvo == 'triage_view_mode') {
+      $class .= ' triage-remove-a ';
+    }
+    if ($class == "none") {
+      $output .= "<div class='triage-action-item'>";
+    }
+    else {
+      $output .= "<div class='triage-action-item " . $class . "'>";
+    }
+    $output .= drupal_render($build);
+    if ($nvo == 'trim') {
+      $output .= "<ul class='links inline'><li class='node-readmore'>" . l('Read More', 'node/' . $nid) . "</li><ul>";
+    }
+    $output .= "</div>";
+  }
+  if ($results) {
+    if ($titl > '') {
+      $output = "<h4>" . $titl . '</h4>' . $output;
+    }
+  }
+  return $output;
+
+}
+
+function triage_filter_types(&$array) {
+  $array = array_values($array);
+  $x = 0;
+  $cnt = count($array);
+  while ($x < $cnt) {
+    if (!$array[$x]) {
+      unset($array[$x]);
+    }
+    $x++;
+  }
+}

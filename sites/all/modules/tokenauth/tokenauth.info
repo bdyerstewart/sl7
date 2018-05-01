@@ -1,0 +1,10 @@
+name = Token authentication
+description = Enable URL-based authentication for specified paths. Allows RSS Readers to view private content.
+core = 7.x
+
+; Information added by drupal.org packaging script on 2013-10-19
+version = "7.x-1.0-alpha1+3-dev"
+core = "7.x"
+project = "tokenauth"
+datestamp = "1382147392"
+

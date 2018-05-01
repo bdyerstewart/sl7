@@ -1,0 +1,23 @@
+
+.nsmi-children-container, .nsmi-synonyms-container {
+  border: 1px solid #dedede;
+  padding: 0.5em;
+  margin: 0.5em 0;
+  width: 100%;
+  float: left;
+}
+
+h2.nsmi_node-teaser-title {
+  font-size: 1.35em;
+  margin-top: 1em;
+}
+
+.nsmi-children-half {
+  width: 50%;
+  float: left;
+}
+
+.bctitle {
+  border-bottom: 2px solid #ccc;
+  margin-bottom: 0.5em;
+}

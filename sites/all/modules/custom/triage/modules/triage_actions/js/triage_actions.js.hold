@@ -1,0 +1,22 @@
+
+
+(function ($) {
+
+  Drupal.behaviors.triage_actions = {
+    attach: function (context, settings) {
+        $('.page-triage-actions-admin ul.taxonomy-tree > li').addClass('collapsible');
+        $('.page-triage-actions-admin ul.taxonomy-tree > li > a').removeAttr('href');
+        $('li.collapsible >a').click(function(){
+          $(this).parent().children().toggleClass('hidden');
+          $(this).parent().toggleClass('collapsed');
+          $(this).removeClass('hidden');
+        })
+        $('.page-taxonomy-actions #overlay-close').click(function(event){
+          event.preventDefault();
+          var path = window.location.protocol + "//" + window.location.host + Drupal.settings.basePath + 'triage_actions_admin';
+          window.location.href=path;
+        })
+    }
+  };
+})(jQuery);
+

@@ -1,0 +1,11 @@
+;$Id$
+name = Visitor Map 
+description = Live Map of current users
+package = Other
+core = 7.x
+scripts[] = visitormap.js
+stylesheets[all][] = visitormap.css
+files[] = visitormap.module
+files[] = visitormap.blocks.inc
+files[] = visitormap.forms.inc
+files[] = visitormap.admin.inc

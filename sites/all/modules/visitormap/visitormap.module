@@ -1,0 +1,142 @@
+<?php
+
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'visitormap') . '/visitormap.admin.inc';
+function visitormap_init(){
+  drupal_add_js('http://maps.googleapis.com/maps/api/js?key=AIzaSyAtoS3vhtaTqowOSw9xlNgPAi9wMNXrXJM','external');
+  drupal_add_js(drupal_get_path('module', 'visitormap') . '/visitormap.js','file');
+  if (!isset($_SESSION['vm_ips'])) {	
+    $_SESSION['vm_ips'] = array() ; 
+  }
+  
+  if (!isset($_SESSION['vm_last_time'])) {	
+    $_SESSION['vm_last_time'] = time(); 
+  }
+}
+function visitormap_menu(){
+  $items['visitormap_data'] = array(
+    'title' => 'Visitor Map Data',
+    'page callback' => 'visitormap_data',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/config/regional/visitormap'] = array(
+    'title' => 'Visitor Map Admin',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('visitormap_admin_form'),
+    'access callback' => TRUE,
+  );
+  return $items;
+}
+
+function visitormap_block_info() {
+  $blocks['visitormap_now'] = array(
+    'info' => t('Most Recent Visitor Map - Live'), //The name that will appear in the block list.
+    'cache' => DRUPAL_NO_CACHE, 
+  );
+  return $blocks;
+}  
+function visitormap_block_view($delta = '') {
+  global $base_url;
+  $image_url = $base_url . "/" . drupal_get_path('module', 'visitormap')."/images";
+  $block = "";
+  $ctext = "";
+  switch($delta){
+    case 'visitormap_now':
+      //visitormap_data();
+      $vm_vars = array();
+      $vm_vars['title'] = variable_get('visitormap_block_title',"");
+      $vm_vars['vm_image_path'] = $image_url;
+      $vm_vars['vm_interval'] = variable_get('visitormap_refresh_interval',10000);
+      $vm_vars['vm_cycles'] = variable_get('visitormap_map_refresh_cycles',25);
+      $vm_vars['vm_center'] = variable_get('visitormap_center_point','36.945502,-88.769531');
+      $vm_vars['vm_zoom'] = variable_get('visitormap_zoom',2);
+      drupal_add_js(array('vm_vars'=>$vm_vars),'setting');
+      drupal_add_js('
+          jQuery(document).ready(function () {
+            visitormap_init();
+          })
+        ',
+        'inline'
+      );
+      $ctext = "<div class='vm-click-me'> </div>";
+      $ctext .= "<div id='visitormap_canvas'> </div>";
+      if ( $vm_vars['title']==''){
+        $block['title'] = "Where is " . variable_get('site_name') . " being used?";
+      }
+      else {
+        $block['title'] = $vm_vars['title'];
+      }
+      $block['content'] = $ctext;
+      break;
+  }
+  return $block;
+}  
+function visitormap_data($new=false){
+  //watchdog('bds',current_path());
+  //return false;
+  $oldips = $_SESSION['vm_ips'];
+  $oldtime = $_SESSION['vm_last_time'];
+  if ($new){
+    $query = db_select('sessions','s');
+    $query->addField('s', 'hostname','ip_address');
+    $query->distinct();
+    if (!empty($oldips)){
+      $query->condition('s.hostname', $oldips, 'NOT IN');
+    }
+    $query->condition('s.timestamp', $oldtime, '>')
+          ->orderBy('s.timestamp', 'DESC')
+          ->range(0,5);
+    $time = db_query('select timestamp from sessions order by 1 desc limit 0,1')->fetchColumn();
+  }
+  else{
+    $query = db_select('sessions','s');
+    $query->distinct();
+    $query->addField('s', 'hostname','ip_address');
+    $query->orderBy('s.timestamp', 'DESC')
+          ->range(0,50);
+    $time = db_query('select timestamp from sessions order by 1 desc limit 0,1')->fetchColumn();
+  }
+  $_SESSION['vm_last_time'] = $time;
+  $ips = $query->execute()->fetchCol();
+  if (count($ips)==0){
+    return false;
+  }
+  if ($new){
+    $_SESSION['vm_ips'] = array_merge($_SESSION['vm_ips'], $ips);
+  }
+  else {
+    $_SESSION['vm_ips'] = $ips;
+  }
+  //$ips = "('" . implode($ips, "', '") . "')";
+  $rquery = db_select('ip_geoloc','i');
+  $rquery->fields('i',array(
+      'ip_address',
+      'latitude',
+      'longitude',
+      'city',
+      'region',
+      'country'
+  ));
+  $rquery->condition('i.ip_address',$ips,'IN');
+  $rquery->range(0,50);
+  watchdog('map',  triage_dpq($rquery,TRUE));
+  $places = $rquery->execute()->fetchAll();
+  
+  $out = "one";
+  $x = 0;
+  $markers = array();
+  foreach($places as $place){
+    $markers[$x] = array(
+        'ip' => $place->ip_address,
+        'lat' => $place->latitude,
+        'lng' => $place->longitude,
+        'city' => $place->city,
+        'region' => $place->region,
+        'country' => $place->country
+    );
+    $x++;
+  }
+  //drupal_add_js('markers',$markers,'setting');
+  drupal_add_js(array('markers' => $markers),'setting');  
+  return drupal_json_output($markers);
+}

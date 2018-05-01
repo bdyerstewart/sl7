@@ -1,0 +1,9 @@
+
+name = "Phiware Voice"
+description = Enable Phiware Voice service for text to speech conversion.
+package = "Other"
+configure = admin/config/system/phiwarevoice
+core = 7.x
+
+stylesheets[all][] = css/phiwarevoice-admin.css
+scripts[] = js/phiwarevoice.js

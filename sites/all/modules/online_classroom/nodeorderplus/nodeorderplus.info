@@ -1,0 +1,5 @@
+name = "Node Order Plus"
+description = "Allows the ordering of nodes within taxonomy terms. Forked from the Node Order module."
+version = "7.x-1.0"
+core = "7.x"
+package = Online Classroom

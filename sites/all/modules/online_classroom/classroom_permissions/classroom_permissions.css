@@ -1,0 +1,28 @@
+.page-admin-classrooms #modalContent #taxonomy-form-term {
+  border:1px solid #ddd;
+  padding:5px 10px;
+}
+
+.page-admin-classrooms #modalContent #taxonomy-form-term label {
+  width:7em;
+}
+
+.page-admin-classrooms #modalContent #taxonomy-form-term .resizable-textarea {
+  margin-left:7em;
+}
+
+.page-admin-classrooms #modalContent #taxonomy-form-term #edit-field-classroom-status-und {
+  display:inline-block;
+}
+
+.page-admin-classrooms #modalContent #taxonomy-form-term .form-actions input {
+  margin-bottom:0;
+}
+
+.page-admin-classrooms #modalContent #taxonomy-form-term #edit-description-format, 
+.page-admin-classrooms #modalContent #taxonomy-form-term #edit-path, 
+.page-admin-classrooms #modalContent #taxonomy-form-term #edit-metatags, 
+.page-admin-classrooms #modalContent #taxonomy-form-term #edit-relations,
+.page-admin-classrooms #modalContent #taxonomy-form-term input#edit-translate {
+  display:none;
+}

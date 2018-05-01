@@ -1,0 +1,1236 @@
+<?php
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'statesidelegal') . '/statesidelegal.blocks.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'statesidelegal') . '/statesidelegal.forms.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'statesidelegal') . '/statesidelegal.admin.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'statesidelegal') . '/statesidelegal.extra.inc';
+
+function statesidelegal_init(){
+  global $base_url;
+  drupal_add_js($base_url . '/misc/jquery.cookie.js');
+  if (!isset($_SESSION['my_org_state'])){
+    $_SESSION['my_org_state'] = null;
+  }
+  if (!isset($_SESSION['my_tid'])) {	
+    $_SESSION['my_tid'] = array() ; 
+    $_SESSION['my_tid'][0] = 0;
+  }
+  if (!isset($_SESSION['wws_tid'])) {	
+    $_SESSION['wws_tid'] = array() ; 
+    $_SESSION['wws_tid'][0] = 0;
+  }
+  if (!isset($_SESSION['is_advocate'])) {	
+    $_SESSION['is_advocate'] = array() ; 
+    $_SESSION['is_advocate'][0] = false;
+  }
+  if (!isset($_SESSION['sl_page'])) {	
+    $_SESSION['sl_page'] = array() ; 
+    $_SESSION['sl_page'][0] = "";
+  }
+  if (!isset($_SESSION['my_state'])) {	
+    $_SESSION['my_state'] = array() ; 
+    $_SESSION['my_state'][0] = "";
+  }
+  if (!isset($_SESSION['my_zip'])) {	
+    $_SESSION['my_zip'] = array() ; 
+    $_SESSION['my_zip'][0] = "";
+  }
+  if (!isset($_SESSION['my_org_type'])) {	
+    $_SESSION['my_org_type'] = array() ; 
+    $_SESSION['my_org_type'][0] = "";
+  }
+  if (!isset($_SESSION['my_map_info'])) {	
+    $_SESSION['my_map_info'] = array() ; 
+    $_SESSION['my_map_info'][0] = "";
+  }
+  if (!isset($_SESSION['vol_zip'])) {	
+    $_SESSION['vol_zip'] = array() ; 
+    $_SESSION['vol_zip'][0] = "";
+  }
+  if (!isset($_SESSION['vol_state'])) {	
+    $_SESSION['vol_state'] = array() ; 
+    $_SESSION['vol_state'][0] = "";
+  }
+  if (!isset($_SESSION['vol_type'])) {	
+    $_SESSION['vol_type'] = array() ; 
+    $_SESSION['vol_type'][0] = "";
+  }
+  if (!isset($_SESSION['vol_keys'])) {	
+    $_SESSION['vol_keys'] = array() ; 
+    $_SESSION['vol_keys'][0] = "";
+  }
+  if (!isset($_SESSION['vol_virtual'])) {	
+    $_SESSION['vol_virtual'] = array() ; 
+    $_SESSION['vol_virtual'][0] = "";
+  }
+  if (!isset($_SESSION['vol_map_info'])) {	
+    $_SESSION['vol_map_info'] = array() ; 
+    $_SESSION['vol_map_info'][0] = "";
+  }
+  if (!isset($_SESSION['adv_sidebar'])) {	
+    $_SESSION['adv_sidebar'] = array() ; 
+    $_SESSION['adv_sidebar'][0] = "volunteer";
+  }
+  if (!isset($_SESSION['org_state'])) {
+    $_SESSION['org_state'] = '';
+  }
+}
+function statesidelegal_permission() {
+  return array(
+    'run org update' => array('title'=> t('run org update'),),
+  );
+} 
+function statesidelegal_menu() {
+  $items = array();
+  $items['library/%'] = array(
+    'title' => 'Stateside Library',
+    'description' => 'StatesideLegal Topic Library',
+    'access callback' => true,
+    'page callback' => 'statesidelegal_library',
+    'page arguments' => array(1),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['statesidemap'] = array(
+    'title' => 'Find Legal Help',
+    'description' => 'Find Legal Help',
+    'access callback' => true,
+    'page callback' => 'statesidelegal_map',
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['topics'] = array(
+    'title' => 'Topic Library',
+    'description' => 'Library Topics',
+    'page callback' => 'statesidelegal_topics',
+    'access arguments' => array('access content'),
+    'page arguments' => array(1),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['lscorgs'] = array(
+    'title' => 'Update LSC Orgs',
+    'description' => 'Update LSC Orgs',
+    'access arguments' => array("run org update"),
+    'page callback' => 'statesidelegal_neworgs',
+    'page arguments' => array(TRUE),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['adv_blog/%user_uid_optional'] = array(
+    'title' => 'My blog',
+    'page callback' => 'statesidelegal_adv_blog',
+    'page arguments' => array(1),
+    'access callback' => 'blog_page_user_access',
+    'access arguments' => array(1),
+    'file' => 'statesidelegal.admin.inc',
+  );
+  $items['stateside_subtopics/%'] = array(
+    'title' => 'Library Subtopics',
+    'page callback' => 'statesidelegal_subtopics',
+    'access callback' => true,
+    'page arguments' => array(1),
+  );
+  $items['stateside_post_subs'] = array(
+    'title' => 'Post Subtopics',
+    'page callback' => 'statesidelegal_postsubs',
+    'access callback' => true,
+  );
+  $items['stateside_counties/%'] = array(
+    'title' => 'Counties',
+    'page callback' => 'statesidelegal_counties',
+    'access arguments' => array('access content'),
+    'page arguments' => array(1,true),
+  );
+  return $items;
+}
+function statesidelegal_menu_alter(&$items){
+  $items['classroom']['theme callback'] = 'statesidelegal_custom_theme';
+  return $items;              
+}
+function statesidelegal_cron() {
+    $datenow = date("Ymd");
+    $lastdate = variable_get("statesidelegal_last_cron_date", date("Ymd"));
+    if ($lastdate==$datenow){
+        variable_set("statesidelegal_last_cron_date", $datenow);
+    }
+    else {
+            variable_set("statesidelegal_last_cron_date", $datenow);
+            watchdog("cron", "Ran org update for " . $datenow);
+            statesidelegal_neworgs();
+   }
+//    statesidelegal_neworgs(true);
+    // Update geo info 
+    statesidelegal_update_geo();
+    $sql = "DELETE FROM users
+            where unix_timestamp() -  created > (60 * 60 * 24 * 60)
+            and not uid in 
+                (select uid from comment 
+                    union select uid from notifications_subscription
+                    union select uid from users_roles)";
+    db_query($sql);
+   
+}
+function statesidelegal_output_menu($main_menu){
+    global $base_path;
+    $path = $base_path . "library/";    
+    $sql = "select t.name, t.tid 
+                from taxonomy_term_data t 
+                inner join taxonomy_term_hierarchy h on h.tid = t.tid 
+                where h.parent = 0 and t.vid = 13 order by weight";
+    $results = db_query($sql);
+    $child_out = "<ul>";
+    foreach ($results as $result) {
+        $child_out .= '<li><a href="' . $path . $result->tid .'">' . $result->name . '</a></li>';
+    }
+    $child_out .= "</ul>";
+    $adv_out = "<ul>";
+    $adv_out .= '<li><a href="' . $base_path . "Advocate-Tool-Kit" .'">Toolkits</a></li>';
+    $adv_out .= '<li><a href="' . $base_path . "blogs" .'">Blogs</a></li>';
+    $adv_out .= '<li><a href="' . $base_path . "topics" .'">Legal Topics</a></li>';
+    $adv_out .= "</ul>";
+    $help_out = "<ul>";
+    $help_out .= '<li><a href="' . $base_path . "va-accredited-advocates" .'">VA Accredited Advocates</a></li>';
+    $help_out .= "</ul>";
+    $menu_out = '<ul id="nav" class="dropdown">';
+    foreach ($main_menu as $menu){
+            $menutitle = $menu['title'];
+            $menuhref = $menu['href'];
+            if ($menuhref=="<front>"){$menuhref='';}
+            switch(strtolower($menutitle)){
+                case "browse topics" :
+                    $menu_out .= '<li class="browse-topics library">';
+                    $menu_out .= '<a href="' . $menuhref . '">' . $menutitle . '</a>';
+                    $menu_out .= $child_out . '</li>';
+                    break;
+                case "find local help" :
+                    $menu_out .= '<li class="browse-topics findhelp">';
+                    $menu_out .= '<a href="' . $menuhref . '">' . $menutitle . '</a>';
+                    $menu_out .= $help_out . '</li>';
+                    break;
+                case "advocates" :
+                    $menu_out .= '<li class="browse-topics advocates">';
+                    $menu_out .= '<a href="' . $menuhref . '">' . $menutitle . '</a>';
+                    $menu_out .= $adv_out . '</li>';
+                    break;
+                case "support us" :
+                    $menu_out .= '<li class="support-us" >';
+                    $menu_out .= '<a href="' . $menuhref . '">' . $menutitle . '</a></li>';
+                    break;
+                default :
+                    $menu_out .= '<li>';
+                    $menu_out .= '<a href="' . $menuhref . '">' . $menutitle . '</a></li>';
+                    break;
+            }
+    }
+    $menu_out .= '</ul><!-- end nav -->';
+    return $menu_out;
+
+}  //end function statesidelegal_output_menu
+function slwomen_output_menu($wmn_menu){
+    //dsm($wmn_menu);
+    unset($wmn_menu['#sorted']);
+    unset($wmn_menu['#theme_wrappers']);
+    
+    global $base_path;
+    $menu_out = '<ul id="nav" class="dropdown">';
+    foreach ($wmn_menu as $menu){
+        $menutitle = $menu['#title'];
+        $menuhref = $menu['#href'];
+        if ($menuhref=="<front>"){
+            $menuhref = '#';
+        }
+        $menu_out .= '<li>';
+        $menu_out .= '<a class="mob-menu-top" href="' . $menuhref . '">' . $menutitle . '</a>';
+        $rays = $menu['#below'];
+        unset($rays['#sorted']);
+        unset($rays['#theme_wrappers']);
+        if ($rays){
+            $menu_out .= "<ul id='sub-nav' class='dropdown'>";
+            foreach ($rays as $sub){
+                $subtitle = $sub['#title'];
+                $subhref = $sub['#href'];
+                $menu_out .= '<li class="sub-menu">';
+                $menu_out .= '<a class = "mob-menu-sub" href="' . $subhref . '">' . $subtitle . '</a></li>';
+            }
+            $menu_out .= '</ul>';
+        }
+        $menu_out .= '</li>';
+    }
+    $menu_out .= '</ul><!-- end nav -->';
+    return $menu_out;
+
+}  //end function statesidelegal_output_menu
+
+function statesidelegal_footer_menu(){
+    global $base_path;
+    $path = $base_path . "library/";    
+    $sql = "select t.name, t.tid, ht.field_alternative_header_text_value as alt 
+                from taxonomy_term_data t 
+                inner join taxonomy_term_hierarchy h on h.tid = t.tid 
+                left join field_data_field_alternative_header_text ht on ht.entity_id = t.tid
+                where h.parent = 0 and t.vid = 13 order by weight";
+    $results = db_query($sql);
+    $child_out = "<div class='list-col-1'><ul><li><a href='".$base_path."topics' >Browse Topics</a><ul>";
+    foreach ($results as $result) {
+        $child_out .= '<li class="list-col-1-1" >';
+        $text = $result->name;
+        if ($result->alt && $result->alt > ""){$text = $result->alt;}
+        $child_out .= '<a href="' . $path . $result->tid . '" >' . $text . '</a>';
+        $child_out .= '</li>';
+    }
+    $child_out .= "</ul></li></ul></div>";
+    
+    return $child_out;
+}
+function statesidelegal_menu_local_tasks_alter(&$data, $router_item, $root_path) {
+  // For note nodes, remove the 'View' tab when viewing the node.
+  foreach ($router_item['page_arguments'] as $key => $argument) {
+      if ($data['tabs']){
+        foreach ($data['tabs'][0]['output'] as $key => $value) {
+            switch ($value['#link']['path']) {
+                case 'node/%/log':
+                    unset($data['tabs'][0]['output'][$key]);
+                case 'node/%/view':
+                    unset($data['tabs'][0]['output'][$key]);
+            }
+        }
+      }
+  }
+}
+function statesidelegal_iso_date ($iso_date) {
+  $date_array = explode("-",$iso_date);
+  $year = $date_array[0];
+  $month = $date_array[1];
+  $day = substr($date_array[2], 0, 2);
+  $date = mktime(0,0,0,$month,$day,$year);
+  return date("l, F d, Y",$date);
+    
+}
+function statesidelegal_subhead(&$page, $title, $node, &$image, &$header, &$sub_header, &$show, &$breadcrumb) {
+    global $base_path;
+    $is_wws = false;
+    $mytext='';
+    $search = "";
+    $support = "";
+    if ($page['sidebar_first']){
+        if (isset($page['sidebar_first']['statesidesearch_statesidesearch_sidebar_search'])){
+            $search = $page['sidebar_first']['statesidesearch_statesidesearch_sidebar_search']['#markup'];
+        }
+        if (isset($page['sidebar_first']['block_25'])){
+            $support = $page['sidebar_first']['block_25']['#markup'];
+        }
+    }
+    $this_image = 'page-header-default.jpg';
+    $header = "";
+    $sub_header = "";
+    $public_files = "sites/default/files/";
+    $mypath = drupal_parse_url(request_uri());
+    $pagevar = explode("/",$mypath['path']);
+    if ($pagevar[1]=='state7'){
+        unset( $pagevar[1]);
+        $pagevar = array_values($pagevar);
+    }
+    if (isset($pagevar[2]) && $pagevar[2]=='sites'){return;}
+    
+    $parent = "none";
+    if ($pagevar[1] == "library" ){
+        $page['sidebar_first']['statesidesearch_statesidesearch_sidebar_search']['#markup']="";
+        $page['sidebar_first']['block_25']['#markup']="";
+
+        $header=$title;
+        $show=false;
+        $this_image = 'books2.jpg';
+        $parent_nsmi_tid = statesidelegal_nsmi_parent($pagevar[2]);
+        $parent_nsmi = taxonomy_term_load($parent_nsmi_tid);
+        $parent_nsmi_name = statesidelegal_nsmi_parent($parent_nsmi_tid,true);
+        $sub_header = $parent_nsmi_name;
+        if ($parent_nsmi){
+            $this_file = $parent_nsmi->field_header_image['und'][0]['filename'];
+            if ($this_file){$this_image = $this_file;}
+            if ($parent_nsmi->vid==24){
+                $sub_header = "Women's Resources";
+                $this_image = "soldier2.jpg";
+            }
+        }
+        $image = 'url(' . $base_path . $public_files . $this_image . ')';   
+        $mytext = statesidelegal_term_list($parent_nsmi_tid).$search.$support;
+        $page['sidebar_first']['quicktabs_sidebar_topics']['content']['container']['divs']['0']['content']['statesidelegal_statesidelegal_sidebar_terms']['#markup'] = $mytext;
+        return;
+    }
+    if ($pagevar[1] == "blogs" ){
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', '');
+        $breadcrumb[] = l("Advocates", 'advocate-network');
+        $breadcrumb = implode(' » ', $breadcrumb);
+    }
+
+    if ( ($pagevar[1] == "blog" || $pagevar[1] == "adv_blog") && is_numeric($pagevar[2])){
+        $this_user = user_load($pagevar[2]);
+        $header=$this_user->profile_fullname . "'s Posts";
+        $show = false;
+        $this_image = 'pens.jpg';
+        $image = 'url(' .$base_path . $public_files . $this_image . ')';
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', '');
+        $breadcrumb[] = l("Advocates", 'advocate-network');
+        $breadcrumb[] = l("Blogs", 'blogs');
+        $breadcrumb = implode(' » ', $breadcrumb);
+        return;
+    }
+
+    if ($pagevar[1] == "blog-topics"){
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', '');
+        $breadcrumb[] = l("Advocates", 'advocate-network');
+        $breadcrumb = implode(' » ', $breadcrumb);
+        $header="Advocate Blogs";
+        $sub_header=$title;
+        $show = false;
+        $this_image = 'pens.jpg';
+        $image = 'url(' .$base_path . $public_files . $this_image . ')';
+        return;
+    }
+    if (!$node){
+        $header=$title;
+        $show=false;
+        return;
+    }
+    //dsm($node);
+    if ($node->type=="page" || $node->type=="banners"){
+        $header=$title;
+        $this_file = false;
+        $alt_title = false;
+        if ($node->field_header_image){
+            $this_file = $node->field_header_image['und'][0]['filename'];
+        }
+        if ($this_file){$this_image = $this_file;}
+        if (field_info_instance("node","field_alternative_header_text",$node->type)){
+            if ($node->field_alternative_header_text){
+                $alt_title = $node->field_alternative_header_text['und'][0]['value'];
+            }
+        }
+        if ($alt_title){$header=$alt_title;}
+        if (field_info_instance("node","field_wws",$node->type)){
+            if (isset($node->field_wws['und'][0]['tid'])){
+                $wws_tid = $node->field_wws['und'][0]['tid'];
+                $is_wws = true;
+                $_SESSION['wws_tid'][0] = $wws_tid;
+            }
+        }
+        
+        $page['sidebar_first']['statesidesearch_statesidesearch_sidebar_search']['#markup']="";
+        $page['sidebar_first']['block_25']['#markup']="";
+        if (field_info_instance("node","taxonomy_vocabulary_13",$node->type)){
+            if (isset($node->taxonomy_vocabulary_13['und'][0]['tid'])){
+                $this_tid = $node->taxonomy_vocabulary_13['und'][0]['tid'];
+            }
+            else {$this_tid = 0;}
+        }
+        else {
+            $this_tid = 0;
+            $_SESSION['my_tid'][0] = 0;
+        }
+        $parent_nsmi_tid = statesidelegal_nsmi_parent($this_tid);
+        $mytext = statesidelegal_term_list($parent_nsmi_tid).$search.$support;
+        // women who serve banner
+        if ($node->nid==250296){
+            $page['triptych_first']['quicktabs_topics']['content']['container']['divs']['1']['content']['statesidelegal_statesidelegal_sidebar_terms']['#markup'] = $mytext;
+        }
+        else {
+            $page['sidebar_first']['quicktabs_sidebar_topics']['content']['container']['divs']['0']['content']['statesidelegal_statesidelegal_sidebar_terms']['#markup'] = $mytext;
+        }
+        $show = false;
+        $image = 'url(' .$base_path . $public_files . $this_image . ')';
+        return;
+    }
+    if ($node->type=="jimsmailbag"){
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', '');
+        $breadcrumb[] = l("Jim's Mailbag", 'completemailbag');
+        $breadcrumb = implode(' » ', $breadcrumb);
+
+        $header = "Jim's Mailbag";
+        $show = true;
+        $image = 'url(' .$base_path . $public_files . $this_image . ')';
+        return;
+    }
+    if ($node->type=="job_posting" ){
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', '');
+        $breadcrumb = implode(' » ', $breadcrumb);
+        $header = "Volunteer Positions";
+        $show = true;
+        $this_image = 'pens.jpg';
+        $image = 'url(' .$base_path . $public_files . $this_image . ')';
+        return;
+    }
+    if ($node->type=="blog" ){
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', '');
+        $breadcrumb[] = l("Advocate Blogs", 'blog');
+        $breadcrumb = implode(' » ', $breadcrumb);
+        $header = "Advocate Blogs";
+        $show = true;
+        $this_image = 'pens.jpg';
+        $image = 'url(' .$base_path . $public_files . $this_image . ')';
+        return;
+    }
+    if ($node->type=="tax_mailbag"){
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', '');
+        $breadcrumb[] = l("Tax Mailbag", 'taxmailbag');
+        $breadcrumb = implode(' » ', $breadcrumb);
+        $header = "Tax Mailbag";
+        $show = true;
+        $image = 'url(' .$base_path . $public_files . $this_image . ')';
+        return;
+    }
+    if (strpos($title,"Interacvtive Form")){
+        $breadcrumb = array();
+        $breadcrumb[] = l('Home', '');
+        $breadcrumb[] = l("Form Letters", 'interactive-forms-directory');
+        $breadcrumb = implode(' » ', $breadcrumb);
+        $header = "Interactive Forms";
+        $show = true;
+        $image = 'url(' .$base_path . $public_files . $this_image . ')';
+        return;
+    }
+    if ($node->type=="aggregation_item"){
+        $header = "News";
+        $show = true;
+        $image = 'url(' .$base_path . $public_files . $this_image . ')';
+        return;
+    }
+    switch($title){
+        case "How can we serve you better?" :
+            $header = "Feedback";
+            $show = false;
+            $image = 'url(' .$base_path . $public_files . $this_image . ')';
+            return;
+        case "Questions for Sean" :
+            $header = "Tax Mailbag";
+            $show = true;
+            $image = 'url(' .$base_path . $public_files . $this_image . ')';
+            return;
+        default :
+            $header = $title;
+            $show = true;
+            $image = 'url(' .$base_path . $public_files . $this_image . ')';
+    }
+    
+    $page['sidebar_first']['statesidesearch_statesidesearch_sidebar_search']['#markup']="";
+    $page['sidebar_first']['block_25']['#markup']="";
+    
+    if (field_info_instance("node","taxonomy_vocabulary_13",$node->type)){
+        $this_tid = 0;
+        if (isset($node->taxonomy_vocabulary_13['und'][0]['tid'])){
+            $this_tid = $node->taxonomy_vocabulary_13['und'][0]['tid'];
+        }
+    }
+    else {
+        $this_tid = 0;
+        $_SESSION['my_tid'][0] = 0;
+    }
+    // See if there is any WomenWhoServe tagging
+    if (field_info_instance("node","field_wws",$node->type)){
+        if (isset($node->field_wws['und'][0]['tid'])){
+            $wws_tid = $node->field_wws['und'][0]['tid'];
+            $is_wws = true;
+        }
+    }
+    else {
+        $this_tid = 0;
+        $_SESSION['wws_tid'][0] = 0;
+    }
+    $this_nsmi = taxonomy_term_load($this_tid);
+    if ($this_nsmi){
+        $this_nsmi_name =$this_nsmi->name;
+    }
+    else {$this_nsmi_name = '';}
+    $parent_nsmi_name = statesidelegal_nsmi_parent($this_tid,true);
+    $parent_nsmi_tid = statesidelegal_nsmi_parent($this_tid);
+    $mytext = statesidelegal_term_list($parent_nsmi_tid).$search.$support;
+    $page['sidebar_first']['quicktabs_sidebar_topics']['content']['container']['divs']['0']['content']['statesidelegal_statesidelegal_sidebar_terms']['#markup'] = $mytext;
+//    if ($is_wws){
+//        $block = module_invoke('statesidesearch', 'block_view', 'statesidesearch_wws_terms');
+//        $parent_wws_tid = statesidelegal_nsmi_parent($wws_tid);
+//        $_SESSION['wws_tid'][0] = $parent_wws_tid;
+//        $myside[1]['content'] = render($block['content']);
+//    }
+    $_SESSION['my_tid'][0] = $parent_nsmi_tid;
+    $parent_nsmi = taxonomy_term_load($parent_nsmi_tid);
+    $header = $parent_nsmi_name;
+    if ($this_nsmi_name != $header){$sub_header = $this_nsmi_name;}
+    if ($parent_nsmi){
+        $this_file = false;
+        if( isset($parent_nsmi->field_header_image['und'])){
+            $this_file = $parent_nsmi->field_header_image['und'][0]['filename'];
+        }
+        if ($this_file){$this_image = $this_file;}
+    }
+    if ($is_wws){
+        $this_image = 'soldier2.jpg';
+    }
+    $image = 'url(' .$base_path . $public_files . $this_image . ')';
+    $this_topic = $this_nsmi_name;
+    $parent_topic = $parent_nsmi_name;
+    $breadcrumb = array();
+    $breadcrumb[] = l('Home', '');
+    $breadcrumb[] = l('Topics', 'topics');
+    if ($parent_nsmi){
+        if ($parent_topic!=$this_topic){
+            $breadcrumb[] = l($parent_topic, 'library/'.$parent_nsmi_tid);
+        }
+    }
+    $breadcrumb[] = l($this_topic, 'library/'.$this_tid);
+    $breadcrumb = implode(' » ', $breadcrumb);
+}
+function statesidelegal_library($tid){
+    $tids = array('');
+    if($tid>0){$_SESSION['sl_page'][0] =  $tid;}
+    if(! isset($_COOKIE['topic_picks'])){
+      $_COOKIE['topic_picks'] = '';
+    }
+    if ($tid == -1){
+        $tds = json_decode($_COOKIE['topic_picks']);
+        //dsm($tds);
+        if($tds){
+            foreach($tds as $key => $value){
+                if ($value){
+                    $tids[] = $key;
+                }
+            }
+        }
+    }
+    else {
+        $tids[] = $tid;
+    }
+    //dsm($tids);
+    global $base_path;
+    global $base_url;
+    $path = $base_path . "node/";  
+    $is_advocate = $_SESSION['is_advocate'][0];
+    $alter['html'] = TRUE;
+    $alter['max_length'] = 500;
+    $alter1['html'] = TRUE;
+    $alter1['max_length'] = 500;
+    $term = taxonomy_term_load($tid);
+    if ($term){
+        $description = $term->description;
+        $tname = $term->name;
+    }
+    else {
+        $description = "";
+        $tname = '';
+    }
+    //dsm($tids);
+    $form = drupal_get_form("statesidelegal_advocate");
+    $output = '<div id="statesidelegal-button-title">Include Advocate Articles </div>' . drupal_render($form);
+    if ($term){
+        $output .= '<section><header><h3>'.$term->name.'</h3></header></section>';
+    }
+    if($description){
+        $output .= '<div class="kicker">' . $description . '</div>';
+    }
+    $subquery = db_select('field_data_taxonomy_vocabulary_13', 'a');
+    $subquery->addField('a','entity_id', 'nid');
+    $subquery->condition('a.taxonomy_vocabulary_13_tid',$tids,"IN");
+    $subquery2 = db_select('field_data_field_wws', 'b');
+    $subquery2->addField('b','entity_id', 'nid');
+    $subquery2->condition('b.field_wws_tid',$tids,"IN");
+    
+    $subquery->union($subquery2, 'UNION ALL');
+    $parent_tid = statesidelegal_nsmi_parent($tid);
+    $parent_topic = statesidelegal_nsmi_parent($tid, true);
+    $this_topic = $tname;
+    $breadcrumb = array();
+    $breadcrumb[] = l('Home', '');
+    $breadcrumb[] = l('Topics', 'topics');
+    
+    
+    if ($is_advocate){$libtypes = array('banners','military','resource','page','advocateresource','advocatelink');}
+    else {$libtypes = array('banners','military','resource','page');}
+//    $libquery = db_select($libdb, "t")->extend('PagerDefault') ;
+//    $libquery->join('node','n','n.nid = t.entity_id');
+//    $libquery->join('field_data_body','b','b.entity_id = n.nid');
+//    $libquery->addfield('n','nid');
+//    $libquery->addfield('n','title');
+//    $libquery->addfield('n','type');
+//    $libquery->addfield('b','body_value','body');
+//    $libquery            
+//            ->condition('n.type', $libtypes, 'IN')
+//            ->condition('n.status', 1, '=')
+//            ->orderBy('n.sticky', 'DESC')
+//            ->orderBy('n.title');
+//    if (count($tids)>0){
+//        $libquery->condition($libfld,$tids,'IN');
+//    }
+//    else {
+//        $libquery->condition($libfld,$tid,'=');
+//    }
+    $libquery = db_select('node', 'n')->extend('PagerDefault') ;
+    $libquery->join('field_data_body','b','b.entity_id = n.nid');
+    $libquery->addfield('n','nid');
+    $libquery->addfield('n','title');
+    $libquery->addfield('n','type');
+    $libquery->addfield('b','body_value','body');
+    $libquery            
+            ->condition('n.type', $libtypes, 'IN')
+            ->condition('n.status', 1, '=')
+            ->condition('n.nid',$subquery,"IN")
+            ->orderBy('n.sticky', 'DESC')
+            ->orderBy('n.title');
+    $libquery->limit(5);
+    $cnt = $libquery->countQuery()->execute()->fetchField();
+    
+    $result = $libquery->execute();
+    foreach ($result as $row) {
+        $audience = '';
+        $node = node_load($row->nid);
+        //dsm($node);
+        $link = "<a class='more' href='" . $path . $row->nid . "' >  more...</a>";
+        if ($cnt == 1){
+            $_SESSION['my_crumb'] = $breadcrumb;
+            drupal_set_breadcrumb($breadcrumb);
+            $path = $base_url . "/node/" . $node->nid;
+            drupal_goto($path);
+            return;
+        }
+        $classes = " article ";
+        if ($row->type=='advocateresource' || $row->type=='advocatelink'){
+            $classes .= " advocate ";
+        }
+        if (isset($node->field_audience['und'])){
+            $audience = $node->field_audience['und'][0]['value'];
+        }
+        $output .= "<section class='" . $classes . "' >";
+        $output .= "<div class='post'>";
+        if( isset($node->body['und']) && $node->body['und'][0]['summary']){
+            $text = strip_tags(views_trim_text($alter1, $node->body['und'][0]['summary'])); 
+        }
+        else {
+            $text = strip_tags(views_trim_text($alter, $row->body)); 
+        }
+        $output .= "<h4 class='title'>
+                        <a href='" . $path . $row->nid . "' >" .$row->title . "</a></h4>";
+        $class2 = '';
+        if ($audience == "Women"){
+            $class2 .= " women ";
+        }
+        
+        $output .= "<p class='" . $class2 . "' >" . $text . $link . "</p>";
+        $output .= rate_embed($node, 'rate_content', RATE_DISABLED + RATE_COMPACT);
+        $output .= "</div></section>";
+    }
+    $parent_tid = statesidelegal_nsmi_parent($tid);
+    $parent_topic = statesidelegal_nsmi_parent($tid, true);
+    $this_topic = $tname;
+    $breadcrumb = array();
+    $breadcrumb[] = l('Home', '');
+    $breadcrumb[] = l('Topics', 'topics');
+    if ($parent_topic!=$this_topic){
+        $breadcrumb[] = l($parent_topic, 'library/'.$parent_tid);
+    }
+    $breadcrumb[] = l($this_topic, 'library/'.$tid);
+    //    $breadcrumb[] = l(drupal_get_title(), base_path() . request_uri()); // Link to current URL
+
+    // Set Breadcrumbs
+    drupal_set_breadcrumb($breadcrumb);    
+
+    // add the content
+    $build = array();
+    $build['content'] = array('#markup' => $output);
+
+    // Add the pager
+    $build['pager'] = array('#theme' => 'pager');
+    // return the renderable array
+    $mtag = metatag_metatags_view( 'global:frontpage', array() );
+    return render($mtag) . render($build);
+    //return render($build);
+    //return $output;
+}
+function statesidelegal_map(){
+    global $base_path;
+    global $base_url;
+    $mapcontent = '';
+    $info = "<div id='info1' class='mapinfo'>
+                <p><img alt='Free Legal Services' src='" . $base_path . "images/smallblueflag.png' />&nbsp;&nbsp;&nbsp;Free legal services </p>
+                <p><img alt='Fee for Services' src='" . $base_path . "images/smallredflag.png' />&nbsp;&nbsp;&nbsp;Fee-based services</p>
+                <p><img alt='Free Women\'s Networks' src='" . $base_path . "images/smallpurpleflag.png' />&nbsp;&nbsp;&nbsp;Free Women's Networks</p>
+            </div>";
+    $form = drupal_get_form("statesidelegal_mapfilter");
+    $content = '<div id="mapsidebar">
+                    <section class="findhelpsearch"><h3>Find Help Near You</h3>' . drupal_render($form) . $info.
+                    '</section></div>' ;
+    // run page twice to get session variable 
+    // eventually we want to rebuild bottom display here
+    ob_start(); // start buffer
+    include ("./". drupal_get_path("module","statesidelegal")."/statesidelegalmap.php");
+    $mapcontent .= "<br />" . ob_get_contents(); // assign buffer contents to variable
+    ob_end_clean(); // end buffer and remove buffer contents
+    $content .= "<iframe id='showmap' src='" . "./".  drupal_get_path("module","statesidelegal") . "/statesidelegalmap.php' ></iframe>" ;
+    $content .= $_SESSION['my_map_info'][0];
+    $build = array();
+    $build['content'] = array('#markup' => $content);
+    $build['pager'] = array('#theme' => 'pager');
+   
+    // return the renderable array
+    return render($build);
+    
+}
+function statesidelegal_vol(){
+    global $base_path;
+    $form = drupal_get_form("statesidevolunteer_mapfilter");
+    $content = '<div id="volunteersearch">' . drupal_render($form) . '</div>' ;
+    // run page twice to get session variable 
+    // eventually we want to rebuild bottom display here
+    ob_start(); // start buffer
+// include ("./". drupal_get_path("module","statesidelegal")."/statesidevolunteermap.php");
+    include ("./". drupal_get_path("module","statesidelegal")."/wslmap.php");
+    $mapcontent .= "<br />" . ob_get_contents(); // assign buffer contents to variable
+    ob_end_clean(); // end buffer and remove buffer contents
+//    $content .= "<iframe id='volmap' src='" . drupal_get_path("module","statesidelegal") . "/statesidevolunteermap.php' ></iframe>" ;
+    $content .= "<iframe id='volmap' src='" . drupal_get_path("module","statesidelegal") . "/wslmap.php' ></iframe>" ;
+    $content .= $_SESSION['vol_map_info'][0];
+    $build = array();
+    $build['content'] = array('#markup' => $content);
+    $build['pager'] = array('#theme' => 'pager');
+   
+    // return the renderable array
+    return render($build);
+    
+}
+function get_location_infos($zip = '', $bystate=false) {
+  
+  if ($zip=="-"){$zip="ME";}
+  $zip = strtr($zip, " ", "+");
+  $gzip = $zip;
+  if ($gzip=="Washington"){
+    $gzip = "Washington+State";
+  }
+  
+  $infos=array();
+  $q =  '+' . $gzip;
+  $q .= ',+us&sensor=true';
+  $url = 'http://maps.googleapis.com/maps/api/geocode/json?address=' . $q;
+  if (is_numeric($zip)){
+    $addr = json_decode(drupal_http_request('http://ziptasticapi.com/'.$zip)->data);
+    $state = $addr->state;
+    $bystate=false;
+  }
+  else {
+      $state = $zip;
+  }
+  $http_reply = drupal_http_request($url);
+  $location_data = json_decode($http_reply->data);
+
+if ($location_data->status != "OK") {
+  $infos['status'] = t('Google Map Interface error, please try later');
+}
+else {
+  $infos['latitude'] = $location_data->results[0]->geometry->location->lat;
+  $infos['longitude'] = $location_data->results[0]->geometry->location->lng;
+  $stateray = statesidelegal_stateinfo($state, $bystate);
+  $infos['state'] = $stateray['name'];
+  $infos['zoom'] = $stateray['zoom'];
+  $infos['abbr'] = $stateray['abbr'];
+  }
+ 
+  return $infos;
+}
+function statesidelegal_stateinfo($thisstate, $bystate=false){
+    if ($bystate){
+        $sql = "SELECT name, abbr, zoom from state where name ='" . strtolower(trim($thisstate)) . "'";
+    }
+    else {
+        $sql = "SELECT name, abbr, zoom from state where abbr ='" . trim($thisstate) . "'";        
+    }
+    $results = db_query($sql)->fetchAssoc();
+    return $results;
+}
+function statesidelegal_topics() {
+    global $base_path;
+    $path = $base_path . "library/";    
+    $is_advocate = $_SESSION['is_advocate'][0];
+    if ($is_advocate){
+        $ctypes = array('military','resource','page','advocateresource','advocatelink');
+    }
+    else {
+        $ctypes = array('military','resource','page');
+    }
+    $sql = "select count(*) 
+                from taxonomy_term_data t 
+                inner join taxonomy_term_hierarchy h on h.tid = t.tid 
+                where h.parent = 0 and t.vid = 13 order by weight";
+    $topicscnt = db_query($sql)->fetchField();
+    $sql = "select t.name, t.tid 
+                from taxonomy_term_data t 
+                inner join taxonomy_term_hierarchy h on h.tid = t.tid 
+                where h.parent = 0 and t.vid = 13 order by weight";
+    $results = db_query($sql);
+    $form = drupal_get_form("statesidelegal_advocate");
+    $out = '<div id="statesidelegal-button-title">Include Advocate Articles </div>' . 
+                drupal_render($form) . "<br /><br />";
+    
+    $out .= "<div class='first-col'>";
+    $halftopics = intval($topicscnt/2) + 1;
+    $k = 0;
+    foreach ($results as $result) {
+        $this_term = taxonomy_term_load($result->tid);
+        $sql = "SELECT COUNT(*) FROM field_data_taxonomy_vocabulary_13 t
+                    JOIN node n on n.nid = t.entity_id
+                    WHERE n.type in (:types)
+                    AND n.status = 1
+                    AND taxonomy_vocabulary_13_tid = :tid";
+        $count = db_query($sql, array(':types'=>$ctypes,':tid' => $result->tid ) )->fetchField();
+
+        $text = $this_term->name;
+        if($this_term->field_alternative_header_text){
+            $text = $this_term->field_alternative_header_text['und'][0]['value']; 
+        }
+        $k++;
+        if ($k == $halftopics){
+            $out .= "</div><div class='second-col'>";
+        }
+        
+        $out .= "<section class='topic'><header>";
+        if ($this_term->field_icon_image){
+            $img = $base_path . drupal_get_path('theme','state7'). "/images/".
+                    $this_term->field_icon_image['und'][0]['filename'];
+            $out .= "<img alt='".$text . "' src='" . $img . "' />";
+        }
+        $subout = statesidelegal_subtopics($result->tid,$count);
+        $out .= '<h4><a href="' . $path . $result->tid .'">' . $text . '</a>' . ' [ ' . $count . ' ]</h4></header>';
+        $out .= $subout;
+        $out .= "</section>";
+    }
+    $out .= "</div>";
+    $build = array();
+    $build['content'] = array('#markup' => $out);
+   
+    // return the renderable array
+    return render(metatag_metatags_view('global:frontpage', array())) . render($build);
+    
+}
+function statesidelegal_subtopics($tid, &$count, $js_only=false) {
+    $is_advocate = $_SESSION['is_advocate'][0];
+    if ($is_advocate){
+        $ctypes = array('military','resource','page','advocateresource','advocatelink');
+    }
+    else {
+        $ctypes = array('military','resource','page');
+    }
+    global $base_path;
+    $path = $base_path . "library/";
+    $output = "";
+    $parent = taxonomy_term_load($tid);
+    $sql = "SELECT COUNT(*) FROM field_data_taxonomy_vocabulary_13 t
+            JOIN node n on n.nid = t.entity_id
+            WHERE n.type in (:types)
+            AND n.status = 1
+            AND taxonomy_vocabulary_13_tid = :tid";
+    $cnt = db_query($sql, array(':types'=>$ctypes,':tid' => $parent->tid ) )->fetchField();
+    
+    if ($children = taxonomy_get_children($tid)) {
+        $output .= "<ul class='gtlist' data-role='listview'>";
+        foreach ($children as $child) {
+            $gc_exist = false;
+            $cnt = 0;
+            if ($grandchildren = taxonomy_get_children($child->tid)) {
+                foreach ($grandchildren as $gcchild) {
+                    $gc_cnt = 0;
+                    $sql = "SELECT COUNT(*) FROM field_data_taxonomy_vocabulary_13 t
+                            JOIN node n on n.nid = t.entity_id
+                            WHERE n.type in (:types)
+                            AND n.status = 1
+                            AND taxonomy_vocabulary_13_tid = :tid";
+                    $gc_cnt = db_query($sql, array(':types'=>$ctypes,':tid' => $gcchild->tid ) )->fetchField();
+                    if ($gc_cnt>0){
+                        $gc_exit = true;
+                    }
+                }
+            }
+            $sql = "SELECT COUNT(*) FROM field_data_taxonomy_vocabulary_13 t
+                    JOIN node n on n.nid = t.entity_id
+                    WHERE n.type in (:types)
+                    AND n.status = 1
+                    AND taxonomy_vocabulary_13_tid = :tid";
+            $cnt = db_query($sql, array(':types'=>$ctypes,':tid' => $child->tid ) )->fetchField();
+            $count = $count + $cnt;
+            if ($cnt>0 || $gc_exist){
+                if ($cnt>0){
+                    //$output .= '<li><a href="' . $path . $child->tid.'">' . $child->name . " [ " . $cnt . " ]</a></li>" ;
+                    $output .= '<li><a href="' . $path . $child->tid .'">' . $child->name . "</a></li>" ;   
+                }
+                else {
+                    $output .= '<li><a href="' . $path . $child->tid .'">' . $child->name . "</a></li>" ;                    
+                }
+            }
+        }
+        $output .= "</ul>";
+    }
+    return $output;   
+}
+function statesidelegal_custom_theme() {
+    $tid = arg(1);
+    $term = taxonomy_term_load($tid);
+    //dsm($term);
+    if (isset($term->og_group_ref) && $term->og_group_ref){
+        return 'state7_groups';
+    }
+}
+function stateside_vol_info($table,&$options){
+    $sql = "DROP TABLE IF EXISTS " . $table;
+    db_query($sql);
+    $options = array();
+    $cState = $_SESSION['vol_state'][0];
+    $cZip = $_SESSION['vol_zip'][0];
+    $cType = $_SESSION['vol_type'][0];
+    $cVirtual = $_SESSION['vol_virtual'][0];
+    if ($cType ==0){$cType = '';}
+    //watchdog('map',$cState.":".$cZip.":".$cType);
+    $cLogic = " AND TRUE ";
+    if ($cType > ""){
+        $cLogic = " AND vt.field_volunteer_type_tid = '" . $cType . "'";
+    }
+    if ($cVirtual > ""){
+        $cLogic = " AND vw.field_work_site_tid = '" . $cVirtual . "'";
+    }
+    if ($cZip > ""){
+        $data = get_location_infos($cZip,false);
+        $options['zoom'] = 10;
+        $cState = $data['abbr'];
+        $_SESSION['vol_state'][0]=$cState;
+        $options['latitude'] = $data['latitude'];
+        $options['longitude'] = $data['longitude'];
+    }
+    else {
+        if ($cState == "" || $cState == "All"){
+            $options['zoom'] = 4;
+            $options['latitude'] = "38.00"; 
+            $options['longitude'] = "-95.00";
+        }
+        else {
+            $data = get_location_infos($cState, false);
+            $options['zoom'] = $data['zoom'];
+            $options['latitude'] = $data['latitude'];
+            $options['longitude'] = $data['longitude'];
+        }
+    }
+    $cState = str_replace("_","",$cState);
+    $cState = str_replace("-","",$cState);
+    if (!$cState || $cState==" "){$cState = "All";}
+    if ($cState=="All") {
+        $sql = "CREATE Temporary Table ". $table . "
+                    SELECT n.nid,
+                        n.title,
+                        l.name,
+                        l.latitude, 
+                        l.longitude,
+                        l.street as address1,
+                        l.additional as address2,
+                        l.city,
+                        '' as tag,
+                        l.province as state,
+                        l.postal_code as zip,
+                        lp.phone as telephone,
+                        lf.fax as telephone2,
+                        em.field_email_value as email,
+                        UNIX_TIMESTAMP(pd.field_publish_dates_value) as startdate,
+                        UNIX_TIMESTAMP(pd.field_publish_dates_value2) as enddate,
+                        u.field_url_value as url
+                    FROM node n
+                    inner join location_instance li on li.nid = n.nid
+                    left join location l on l.lid = li.lid
+                    left join location_phone lp on lp.lid = li.lid
+                    left join location_fax lf on lf.lid = li.lid
+                    left join field_data_field_email em on em.entity_id = n.nid
+                    left join field_data_field_publish_dates pd on pd.entity_id = n.nid
+                    left join field_data_field_url u on u.entity_id = n.nid
+                    left join field_data_field_volunteer_type vt on vt.entity_id = n.nid
+                    left join field_data_field_work_site vw on vw.entity_id = n.nid
+                    WHERE n.type = 'job_posting'
+                    AND NOT ISNULL(l.longitude) 
+                    AND NOT ISNULL(l.latitude) " . $cLogic . "
+                    GROUP BY n.nid";
+        $options['latitude'] = "38.00"; 
+        $options['longitude'] = "-95.00";
+    }
+    else {
+        $gState = $cState;
+        if ($gState=="Washington"){
+            $gState = "Washington+State";
+        }
+        $sql = "CREATE Temporary Table " . $table . "
+                    SELECT n.nid,
+                        n.title,
+                        l.name,
+                        l.latitude, 
+                        l.longitude,
+                        l.street as address1,
+                        l.additional as address2,
+                        l.city,
+                        l.province as state,
+                        '' as tag,
+                        l.postal_code as zip,
+                        lp.phone as telephone,
+                        lf.fax as telephone2,
+                        em.field_email_value as email,
+                        UNIX_TIMESTAMP(pd.field_publish_dates_value) as startdate,
+                        UNIX_TIMESTAMP(pd.field_publish_dates_value2) as enddate,
+                        u.field_url_value as url
+                    FROM node n
+                    inner join location_instance li on li.nid = n.nid
+                    left join location l on l.lid = li.lid
+                    left join location_phone lp on lp.lid = li.lid
+                    left join location_fax lf on lf.lid = li.lid
+                    left join field_data_field_email em on em.entity_id = n.nid
+                    left join field_data_field_publish_dates pd on pd.entity_id = n.nid
+                    left join field_data_field_url u on u.entity_id = n.nid
+                    left join field_data_field_volunteer_type vt on vt.entity_id = n.nid
+                    left join field_data_field_work_site vw on vw.entity_id = n.nid
+                    left join taxonomy_term_data tx on tx.tid = vt.field_volunteer_type_tid
+                    WHERE n.type = 'job_posting'
+                    AND NOT ISNULL(l.longitude) 
+                    AND NOT ISNULL(l.latitude) " . $cLogic . "
+                    AND l.province ='" . $cState . "' 
+                    GROUP BY n.nid";
+    }
+    db_query($sql);
+}
+function stateside_makesubs(){
+    global $base_path;
+    $sql = "select t.name, t.tid 
+                from taxonomy_term_data t 
+                inner join taxonomy_term_hierarchy h on h.tid = t.tid 
+                where h.parent = 0 and t.vid = 24 order by weight";
+    $results = db_query($sql);
+    $out = '';
+    $out .= "<form id='bds' action='" . $base_path . "demo.php' method='post'>";
+    foreach($results as $result){
+        $tid = $result->tid;
+        $name = $result->name;
+        $out .= "<div class='subtopic sub-" . $tid . "'>";
+        $out .= statesidelegal_subtopic_list ($tid);
+        $out .= "</div>";
+    }
+    $sql = "select t.name, t.tid 
+                from taxonomy_term_data t 
+                inner join taxonomy_term_hierarchy h on h.tid = t.tid 
+                where h.parent = 0 and t.vid = 13 order by weight";
+    $results = db_query($sql);
+    //$out = '';
+    $out .= "<form id='bds' action='" . $base_path . "demo.php' method='post'>";
+    foreach($results as $result){
+        $tid = $result->tid;
+        $name = $result->name;
+        $out .= "<div class='subtopic sub-" . $tid . "'>";
+        $out .= statesidelegal_subtopic_list ($tid);
+        $out .= "</div>";
+    }
+    $out .= "</form>";
+    return $out;
+}
+function stateside_subtopics($tid = 0){
+    if ($tid ==0){return "";}
+    $ctext = statesidelegal_subtopic_list($tid);
+    return drupal_json_output($ctext);
+}
+function statesidelegal_subtopic_list ($tid){
+    $output = "";
+    if (!$tid){return $output;}
+    $is_advocate = $_SESSION['is_advocate'][0];
+    if ($is_advocate){
+        $ctypes = array('banners','military','resource','page','advocateresource','advocatelink');
+    }
+    else {
+        $ctypes = array('banners','military','resource','page');
+    }
+    $this_nsmi = taxonomy_term_load($tid);
+    $tbl = 'field_data_taxonomy_vocabulary_13';
+    $fld = 'taxonomy_vocabulary_13_tid';
+    if ($this_nsmi->vid==24){
+        $tbl = 'field_data_field_wws';
+        $fld = 'field_wws_tid';
+    }
+    global $base_path;
+    
+    $path = $base_path . "library/";
+    $parent = taxonomy_term_load($tid);
+    $sql = "SELECT COUNT(*) FROM " . $tbl . " t
+            JOIN node n on n.nid = t.entity_id
+            WHERE n.type in (:types)
+            AND n.status = 1
+            AND " . $fld . " = :tid";
+    $cnt = db_query($sql, array(':types'=>$ctypes,':tid' => $parent->tid ) )->fetchField();
+    if ($cnt>0){
+        $output = '<div id="nsmi_cats_block" class="block block-block" ><nav><h4><a href="' . $path . $parent->tid .'">' . $this_nsmi->name . "</a>";
+    }  
+    if ($children = taxonomy_get_children($tid)) {
+       if ($output==''){
+        $output = '<div id="nsmi_cats_block" class="block block-block" ><nav><h4><a href="' . $path . $parent->tid .'">' . $parent->name . "</a>";
+       }
+       $output .= "</h4><ul id='side-nav'>";
+//       $output .= "<form id='bds' action='" . $base_path . "demo.php' method='post'>";
+       $output .= "<div class='topic-action'><a href='#' onclick='stateside_get_topics()'>Go</a></div>";
+       $output .= "<div class='topic-action'><a href='#' onclick='stateside_clear_topics()'>Clear</a></div>";
+       $output .= "<div class='container-topic-action'></div>";
+       $output .= '<input type="checkbox" class="topic-click" id="clickit-' . $tid . '"></input><li><a href="' . $path . $tid.'">' . $this_nsmi->name. "</a></li>" ;
+       foreach ($children as $child) {
+            $gc_exist = false;
+            $cnt = 0;
+            if ($grandchildren = taxonomy_get_children($child->tid)) {
+                foreach ($grandchildren as $gcchild) {
+                    $gc_cnt = 0;
+                    $sql = "SELECT COUNT(*) FROM " . $tbl . " t
+                            JOIN node n on n.nid = t.entity_id
+                            WHERE n.type in (:types)
+                            AND n.status = 1
+                            AND " . $fld . " = :tid";
+                    $gc_cnt = db_query($sql, array(':types'=>$ctypes,':tid' => $gcchild->tid ) )->fetchField();
+                    if ($gc_cnt>0){
+                        $gc_exist = true;
+                    }
+                }
+            }
+            $sql = "SELECT COUNT(*) FROM " . $tbl . " t
+                    JOIN node n on n.nid = t.entity_id
+                    WHERE n.type in (:types)
+                    AND n.status = 1
+                    AND " . $fld . " = :tid";
+            $cnt = db_query($sql, array(':types'=>$ctypes,':tid' => $child->tid ) )->fetchField();
+            if ($cnt>0 || $gc_exist){
+                if ($cnt>0){
+                    $output .= '<input type="checkbox" class="topic-click" id="clickit-' . $child->tid . '"></input><li><a href="' . $path . $child->tid.'">' . $child->name. "</a></li>" ;
+                }
+                else {
+                    $output .= '<input type="checkbox" class="topic-click" id="clickit-' . $child->tid . '"></input><li><a href="#">' . $child->name . "</a></li>" ;                    
+                }
+                if ($grandchildren = taxonomy_get_children($child->tid)) {
+                    foreach ($grandchildren as $gcchild) {
+                        $gc_cnt = 0;
+                        $sql = "SELECT COUNT(*) FROM " . $tbl . " t
+                                JOIN node n on n.nid = t.entity_id
+                                WHERE n.type in (:types)
+                                AND n.status = 1
+                                AND " . $fld . " = :tid";
+                        $gc_cnt = db_query($sql, array(':types'=>$ctypes,':tid' => $gcchild->tid ) )->fetchField();
+                        if ($gc_cnt>0){
+                           $output .= '<input type="checkbox" class="gctopic-click" id="clickit-' . $gcchild->tid . '"></input><li class="lib_grandchildren"><a href="' . $path . $gcchild->tid.'">' . $gcchild->name . "</a></li>" ;
+                        }
+                    }
+                }
+
+            }
+        }
+//        $output .= "</form></ul></nav></div>";
+        $output .= "</ul></nav></div>";
+    }
+    return $output;
+}
+function stateside_postsubs(){
+    global $base_path;
+    //dsm("Hey");
+    drupal_goto($base_path);
+}
+function stateside_women_banner(){
+}
+function statesidelegal_mail_alter(&$message) {
+  //dpm($message);
+}

@@ -1,0 +1,17 @@
+<?php
+/**
+ * @file
+ * Code for the Online Classroom feature.
+ */
+
+include_once 'online_classroom.features.inc';
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function online_classroom_ctools_plugin_directory($owner, $plugin_type) {
+  // We'll be nice and limit scandir() calls.
+  if ($owner == 'ctools') {
+    return 'plugins/' . $plugin_type;
+  }
+}

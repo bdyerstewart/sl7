@@ -1,0 +1,13 @@
+;$Id$
+name = triage_actions
+description = Adds triage action functionality to build output for triage selections
+package = Triage
+core = 7.x
+dependencies[] = triage
+
+scripts[] = js/triage_actions.js
+stylesheets[all][] = css/triage_actions.css
+stylesheets[all][] = css/triage_actions_custom.css
+files[] = triage_actions.module
+files[] = triage_actions.forms.inc
+files[] = triage_actions.css

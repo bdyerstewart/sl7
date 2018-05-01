@@ -1,0 +1,9 @@
+name = "Classroom AJAX Functions"
+description = "Enables AJAX for Classrooms"
+core = 7.x
+package = Online Classroom
+dependencies[] = online_classroom
+
+version = "7.x-1.0"
+core = "7.x"
+

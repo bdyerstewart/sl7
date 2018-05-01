@@ -1,0 +1,449 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function triage_ai_menu() {
+  $items = array();
+  $items['admin/config/triage-ai'] = array(
+    'title' => 'Triage AI Configuration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_ai_admin_form'),
+    'access callback' => 'triage_ai_admin_access'
+  );
+  $items['triage-ai/classifier-demo'] = array(
+    'title' => 'Classifier demo form',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_ai_classifier_form'),
+    'access callback' => TRUE
+  );
+
+  $items['triage-ai/classifier-feedback'] =
+    array(
+      'title' => 'Classifier feedback',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('triage_ai_classify_feedback_form'),
+      'access callback' => TRUE,
+    );
+  return $items;
+}
+
+function triage_ai_admin_access() {
+  return user_access('administer houston ai');
+}
+
+/**
+ * Implements hook_permission().
+ */
+function triage_ai_permission() {
+  return array(
+    'administer houston ai' => array(
+      'title' => t('Administer Houston.ai'),
+      'description' => t('Set API key and defaults')
+    ),
+  );
+}
+
+/**
+ * Calls the Houston.ai classify api.
+ *
+ * @param $location
+ *   A location string; may be zip code, city, state, full address.
+ * @param $problem
+ *   A string describing the problem to be classified.
+ * @param $document
+ *   A document in base64 format to be classified.  If provided, the problem is
+ *   ignored.
+ * @return mixed
+ */
+function triage_ai_classify($location, $problem, $document) {
+  $endpoint = 'https://houston.ai/api/classify';
+  $api_key = variable_get('triage_ai_api_key');
+  if (empty($location)) {
+    $location = variable_get('triage_ai_default_location');
+  }
+  if (empty($api_key)) {
+    drupal_set_message(t('No valid API key found; please visit <a href="/admin/triage-ai">configuration</a> to set'), 'error');
+  }
+  else {
+    $url = $endpoint . '?api_key=' . $api_key;
+    if (!empty($document)) {
+      $data = array("location" => $location, "document" => $document,);
+    }
+    else {
+      $data = array("location" => $location, "text" => $problem,);
+    }
+
+    $data_json = json_encode($data);
+
+
+    $ch = curl_init();
+
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
+    curl_setopt($ch, CURLOPT_POST, 1);
+
+    $headers = array();
+    $headers[] = "Content-Type: application/json";
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+    $result = curl_exec($ch);
+    if (curl_errno($ch)) {
+      echo 'Error:' . curl_error($ch);
+    }
+    curl_close($ch);
+
+    $decoded = json_decode($result);
+
+    return $decoded;
+  }
+}
+
+/**
+ * Calls the Houston.ai classify feedback API.
+ *
+ * @param $sessionid
+ *   Session id from the classify API result you are providing feedback for.
+ * @param $wasCorrect
+ *   1 (true) or 0 (false).
+ * @param $actualCode
+ *   The actual code that matched the problem.
+ * @param $comment
+ *   A string of comments
+ * @return mixed
+ */
+
+function triage_ai_classify_feedback($sessionid, $wasCorrect, $actualCode, $comment) {
+  $endpoint = 'https://houston.ai/api/classify-feedback';
+  $api_key = variable_get('triage_ai_api_key');
+  if (empty($api_key)) {
+    drupal_set_message(t('No valid API key found; please visit <a href="/admin/triage-ai">configuration</a> to set'), 'error');
+  }
+  else {
+    $url = $endpoint . '?api_key=' . $api_key;
+    $data = array(
+      'sessionId' => $sessionid,
+      'wasCorrect' => $wasCorrect == 1,
+      'actualCode' => $actualCode,
+      'comment' => $comment,
+    );
+    $data_json = json_encode($data);
+
+    $ch = curl_init();
+
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
+    curl_setopt($ch, CURLOPT_POST, 1);
+
+    $headers = array();
+    $headers[] = "Content-Type: application/json";
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+    $result = curl_exec($ch);
+    if (curl_errno($ch)) {
+      watchdog('triage_ai','An error occurred @error',array('@error' => curl_error($ch)),WATCHDOG_ERROR);
+    }
+    curl_close($ch);
+
+    $decoded = json_decode($result);
+    return $decoded;
+  }
+}
+
+/**
+ * Calls Houston.ai problem code API
+ *
+ * @return mixed
+ *   List of problem codes.
+ */
+
+function triage_ai_problem_codes() {
+  $endpoint = 'https://houston.ai/api/problem-codes';
+  $api_key = variable_get('triage_ai_api_key');
+  $url = $endpoint . '?api_key=' . $api_key;
+
+
+  $ch = curl_init();
+
+  curl_setopt($ch, CURLOPT_URL, $url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+
+  curl_setopt($ch, CURLOPT_POST, 0);
+
+
+
+  $result = curl_exec($ch);
+  if (curl_errno($ch)) {
+    echo 'Error:' . curl_error($ch);
+  }
+  curl_close($ch);
+
+  $decoded = json_decode($result);
+  return $decoded;
+
+}
+
+/**
+ * Admin form for module.
+ *
+ * Allows user to store their API key for use on the site.
+ *
+ * Default location is used in the classify API if no user location is provided.
+ *
+ * @param $form
+ * @param $form_state
+ * @return mixed
+ */
+function triage_ai_admin_form($form, &$form_state) {
+
+  $form['triage_ai_api_key'] = array(
+    '#title' => t('API key'),
+    '#type' => 'textfield',
+    '#description' => t('Contact Houston.ai for a license key.'),
+    '#required' => TRUE,
+    '#default_value' => variable_get('triage_ai_api_key'),
+  );
+  $form['triage_ai_default_location'] = array(
+    '#title' => t('Default location'),
+    '#type' => 'textfield',
+    '#description' => t('Default location to be used with the classify API if none is provided.'),
+    '#required' => TRUE,
+    '#default_value' => variable_get('triage_ai_default_location'),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Save'
+  );
+  $form['#submit'][] = 'triage_ai_admin_submit';
+
+  return $form;
+}
+
+/**
+ * Demo classifier form.
+ *
+ * @param $form
+ * @param $form_state
+ * @return mixed
+ */
+function triage_ai_classifier_form($form, &$form_state) {
+
+  $form['file_or_text'] = array(
+    '#type' => 'radios',
+    '#title' => 'Upload image file or enter problem?',
+    '#options' => array(1 => 'file', 2 => 'text'),
+  );
+  $form['problem'] = array(
+    '#type' => 'textarea',
+    '#title' => t('What is your problem?'),
+    '#states' => array(
+      'visible' => array(
+        ':input[name="file_or_text"]' => array('value' => '2'),
+      ),
+    ),
+  );
+  $form['file1'] = array(
+    '#type' => 'file',
+    '#title' => t('Image'),
+    '#description' => t('Upload a file, allowed extensions: jpg, jpeg, png, pdf'),
+    '#states' => array(
+      'visible' => array(
+        ':input[name="file_or_text"]' => array('value' => '1'),
+      ),
+    ),
+  );
+  $form['location'] = array(
+    '#type' => 'textfield',
+    '#title' => t('What is your address?'),
+
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Save'
+  );
+  $form['#submit'][] = 'triage_ai_classifier_submit';
+  $form['#validate'][] = 'triage_ai_classifier_validate';
+
+  return $form;
+}
+
+/**
+ * Validates classifier form.
+ *
+ * Uploads file if one is attached.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function triage_ai_classifier_validate($form, &$form_state) {
+
+  $file1 = file_save_upload('file1');
+
+  if (isset($file1)) {
+    if ($file1) {
+      // The temporary file should be put in form_values so we can save it on submit.
+      $form_state['values']['file1_upload'] = $file1;
+      $file = file_unmanaged_copy($file1->uri, variable_get('file_public_path', conf_path() . '/files'));
+      $form_state['values']['filename'] = $file;
+
+    }
+    else {
+      // File upload failed.
+      form_set_error('file1', t('The file cannot be uploaded.'));
+    }
+  }
+}
+
+/**
+ * Submit function for demo classifier form.
+ *
+ * Encodes any file to base64.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function triage_ai_classifier_submit($form, &$form_state) {
+
+  $location = $form_state['values']['location'];
+  $problem = $form_state['values']['problem'];
+  if (isset($form_state['values']['file1_upload'])) {
+    $filename = $form_state['values']['file1_upload']->filename;
+
+    $contents = base64_encode(file_get_contents($form_state['values']['filename']));
+    $document = $contents;
+  }
+  else {
+    $document = "";
+  }
+
+  $result = triage_ai_classify($location, $problem, $document);
+
+  if (empty($result->code->code)) {
+    $_SESSION['houston'] = $result;
+    drupal_set_message(t('The Houston.ai API was not able to classify the problem.'), 'status');
+    $form_state['redirect'] = 'triage-ai/classifier-feedback';
+  }
+  else {
+    $_SESSION['houston'] = $result;
+    $form_state['redirect'] = 'triage-ai/classifier-feedback';
+
+  }
+
+}
+
+function triage_ai_classify_feedback_form($form, &$form_state) {
+  if (isset($_SESSION['houston'])) {
+    if (!empty($_SESSION['houston']->code->code)) {
+      $wascorrect_title = t('Is your problem related to ' . $_SESSION['houston']->code->label .'?');
+      $problems = triage_ai_set_problems($_SESSION['houston']->otherProbabilities);
+
+      $form['wascorrect'] = array(
+        '#type' => 'radios',
+        '#title' => $wascorrect_title,
+        '#options' => array(1 => t('Yes'), 0 => t('No')),
+      );
+      $form['other_options'] = array(
+        '#type' => 'radios',
+        '#title' => t('Is your problem related to one of these?'),
+        '#options' => $problems,
+        '#states' => array(
+          'visible' => array(
+            ':input[name="wascorrect"]' => array('value' => '0'),
+          ),
+        ),
+      );
+      $form['all_options'] = array(
+        '#type' => 'select',
+        '#title' => t('Please select the best option that matches the problem submitted.'),
+        '#options' => triage_ai_set_default_problems(),
+        '#states' => array(
+          'visible' => array(
+            ':input[name="other_options"]' => array('value' => '0'),
+          ),
+        ),
+      );
+    }
+    else {
+      $form['all_options'] = array(
+        '#type' => 'select',
+        '#title' => t('Please select the best option that matches the problem submitted.'),
+        '#options' => triage_ai_set_default_problems(),
+        '#states' => array(
+          'visible' => array(
+            ':input[name="other_options"]' => array('value' => '0'),
+          ),
+        ),
+      );
+    }
+    $form['comments'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Comments'),
+    );
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => 'Save'
+    );
+    $form['#submit'][] = 'triage_ai_classify_feedback_submit';
+
+    return $form;
+  }
+  else {
+    drupal_set_message('No session id was found; please start by classifying a problem.', 'error');
+  }
+}
+
+function triage_ai_classify_feedback_submit($form, &$form_state) {
+
+  $sessionid = $_SESSION['houston']->sessionId;
+  $wasCorrect = $form_state['values']['wascorrect'];
+  if ($wasCorrect) {
+    $actualCode = $_SESSION['houston']->code->code;
+  }
+  else {
+    if (!empty($form_state['values']['other_options'])) {
+      $actualCode = $form_state['values']['other_options'];
+    }
+    else {
+      $actualCode = $form_state['values']['all_options'];
+    }
+
+  }
+  $comment = '';
+  $response = triage_ai_classify_feedback($sessionid, $wasCorrect, $actualCode, $comment);
+  drupal_set_message(t('Thank you for your feedback!'),'status');
+  $form_state['redirect'] = 'triage-ai/classifier-demo';
+  if (isset($_SESSION['houston'])) {
+    unset($_SESSION['houston']);
+  }
+}
+
+function triage_ai_set_problems($data) {
+  $options = array();
+  foreach ($data as $key => $value) {
+
+    $options[$value->code->code] = $value->code->label;
+  }
+  $options[0] = t('None of these');
+  return $options;
+}
+
+function triage_ai_set_default_problems() {
+  $options = array();
+  $full_list = triage_ai_problem_codes();
+  foreach ($full_list->codeGroups as $key => $value) {
+     //$options[] = $value->groupName;
+
+      foreach($value->codes as $codeKey => $codeValue) {
+        $options[$value->groupName][$codeValue->code] = $codeValue->label;
+      }
+  }
+  return $options;
+}
+
+function triage_ai_admin_submit($form, &$form_state) {
+  variable_set('triage_ai_api_key', $form_state['values']['triage_ai_api_key']);
+  variable_set('triage_ai_default_location', $form_state['values']['triage_ai_default_location']);
+  drupal_set_message(t('Your changes have been saved.'), 'status');
+}

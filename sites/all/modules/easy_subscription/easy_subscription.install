@@ -1,0 +1,43 @@
+<?php
+/**
+ * @file
+ * Install, update and uninstall functions for the easy_subscription module.
+ */
+
+function easy_subscription_schema() {
+
+  $schema['easy_subscription_people'] = array(
+    'description' => 'Store subscriptores.',
+    'fields' => array(
+      'sid'  => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique subscriptor ID.',
+      ),
+      'email' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'Email of the subscriptor.',
+      ),
+      'did' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Domain id of the subscription.',
+      ),
+    ),
+    'unique keys' => array(
+      'email' => array('email')),
+    'primary key' => array('sid'),
+    'indexes' => array(
+      'did'	=> array('did'),
+    ),    
+  );
+
+
+
+  return $schema;
+}
+

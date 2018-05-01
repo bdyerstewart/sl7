@@ -1,0 +1,43 @@
+; State7 - Stateside Legal's Drupal 7 Theme
+name        = State7
+description = Stateside Legal 
+core = 7.x
+
+screenshot = screenshot.png
+
+stylesheets[all][]   = css/normalize.min.css
+stylesheets[all][]   = css/main.css
+stylesheets[all][]   = state7.css
+stylesheets[print][] = print.css
+
+;scripts[] = js/respond.js
+scripts[] = js/currentGuidelines.js
+scripts[] = js/jquery.dropdown.js
+scripts[] = js/main.js
+scripts[] = js/read.js
+scripts[] = js/jquery.cycle.lite.js
+scripts[] = js/jquery.cookie.js
+scripts[] = state7.js
+
+regions[header] = Header
+regions[help] = Help
+regions[page_top] = Page top
+regions[page_bottom] = Page bottom
+regions[highlighted] = Highlighted
+regions[menubar] = Menu Bar
+
+regions[featured] = Featured
+regions[content] = Content
+regions[sidebar_first] = Sidebar first
+regions[sidebar_second] = Sidebar second
+
+regions[triptych_first] = Triptych first
+regions[triptych_middle] = Triptych middle
+regions[triptych_last] = Triptych last
+
+regions[footer_firstcolumn] = Footer first column
+regions[footer_secondcolumn] = Footer second column
+regions[footer] = Footer
+
+version = "7.0"
+project = "drupal"

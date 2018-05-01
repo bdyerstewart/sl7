@@ -1,0 +1,54 @@
+<?php
+
+/**
+ * @file
+ * Classroom Permissions.
+ */
+
+/**
+ * Implements hook_permission().
+ *
+ * We create two permissions, which we can use as a base for our grant/deny
+ * decision:
+ *
+ * - 'access any private content' allows global access to content marked
+ *   private by other users.
+ * - 'edit any private content' allows global edit
+ *   privileges, basically overriding the node access system.
+ *
+ * Note that the 'edit any * content' and 'delete any * content' permissions
+ * will allow edit or delete permissions to the holder, regardless of what
+ * this module does.
+ *
+ * @see hook_permissions()
+ */
+function classroom_permissions_permission() {
+  return array(
+    'access classroom' => array(
+      'title' => t('Access Classroom Dashboard'),
+      'description' => t('Gives access to Classroom Dashboard.'),
+    ),
+    'create classroom' => array(
+      'title' => t('Create Classrooms'),
+      'description' => t('Allows for the creation of Classrooms.'),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function classroom_permissions_menu() {
+  $items = array();
+
+  $items['modal/classroom/add'] = array(
+    'title' => 'Add Classroom',
+    'page callback' => 'classroom_permissions_add',
+    'access arguments' => array('create classroom'),
+    'type' => MENU_CALLBACK,
+    'file' => 'classroom_permissions.pages.inc',
+  );
+
+  return $items;
+}
+

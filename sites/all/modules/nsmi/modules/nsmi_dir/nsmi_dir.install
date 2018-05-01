@@ -1,0 +1,13 @@
+<?php
+
+function nsmi_dir_uninstall() {
+  nsmi_dir_remove_variables('nsmi_dir');
+}
+
+function nsmi_dir_remove_variables($namespace) {
+  $result = db_query("SELECT name FROM {variable} WHERE name LIKE '{$namespace}_%'");
+  
+  while ($row = db_fetch_object($result)) {
+    variable_del($row->name);
+  }
+}

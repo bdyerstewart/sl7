@@ -1,0 +1,1094 @@
+<?php
+// $Id$
+/**
+* @file
+* Custom search module
+*
+* This module provides user data questions and assembles search from 
+ * several components: Featured Returns, NSMI Matches, node and attachment searches
+ * The display is in a accordianed list by Featured and Additional results with pager
+*/
+/**
+* Implements hook_help().
+*/
+include 'search_all.extender.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'search_all') . '/search_all.admin.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'search_all') . '/search_all.forms.inc';
+function search_all_init(){
+  if (!isset($_SESSION['search_all_total'])) { $_SESSION['search_all_total'] = array() ;	}
+  if (!isset($_SESSION['is_advocate'])) {	
+    $_SESSION['is_advocate'] = array() ; 
+    $_SESSION['is_advocate'][0] = false;
+  }  
+  drupal_add_css(drupal_get_path('module', 'search_all') . 'search_allsearch.css', 
+                  array('group' => CSS_DEFAULT, 'every_page' => TRUE));
+}
+
+function search_all_permission() {
+  return array(
+    'access search_all search' => array('title'=> t('access search_all search'),),
+  );
+} 
+
+function search_all_menu() {
+  $items = array();
+  $items['search_all/%'] = array(
+    'title' => 'Search Results',
+    'description' => 'Search Results',
+    'access arguments' => array('access search_all search'),
+    'page callback' => 'search_all_page',
+    'page arguments' => array(1),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['search_all_full/%'] = array(
+    'title' => 'Search Results',
+    'description' => 'Additional Search Results',
+    'access arguments' => array('access search_all search'),
+    'page callback' => 'search_all_pagefull',
+    'page arguments' => array(1),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/reports/search_all_results'] = array(
+    'title' => 'Search Analysis',
+    'description' => 'Filterable Search Keyword Analysis',
+    'page callback' => 'search_all_results_info',
+    'access arguments' => array('access content'),
+    'page arguments' => array(1),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/config/search/search_all'] = array(
+    'title' => 'Advanced Search Configuration',
+    'access callback' => true,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('search_all_admin_form'),
+    'access arguments' => array('administer users'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  
+  return $items;
+}
+
+function search_all_help($path, $arg) {
+  if ($path == 'admin/help#search_all') {
+    return t('Custom Search Module');
+  }
+}
+
+function search_all_cron() {
+    
+    // Update term_synonyms with any missing nsmi tag names
+    $sql = "INSERT INTO {field_data_synonyms_synonyms} 
+              (entity_type, bundle, entity_id, revision_id, language, delta, synonyms_synonyms_value )
+              SELECT 'taxonomy_term' as entity_type, 
+              'tags' as bundle,
+              tid as entity_id,
+              tid as revision_id,
+              'und' as language,
+              0 as delta,
+              name as synonyms_synonyms_value
+              FROM {taxonomy_term_data} td
+              WHERE vid in
+                (select vid from {taxonomy_vocabulary} where name = 'nsmi vocabulary')
+              AND NOT name IN
+              (SELECT synonyms_synonyms_value
+                FROM {field_data_synonyms_synonyms} ts
+                where ts.entity_id = td.tid)";
+    db_query($sql);
+
+    $sql = "INSERT INTO {field_revision_synonyms_synonyms} 
+              (entity_type, bundle, entity_id, revision_id, language, delta, synonyms_synonyms_value )
+              SELECT 'taxonomy_term' as entity_type, 
+              'tags' as bundle,
+              tid as entity_id,
+              tid as revision_id,
+              'und' as language,
+              0 as delta,
+              name as synonyms_synonyms_value
+              FROM {taxonomy_term_data} td
+              WHERE vid in
+                (select vid from {taxonomy_vocabulary} where name = 'nsmi vocabulary')
+              AND NOT name IN
+              (SELECT synonyms_synonyms_value
+                FROM {field_revision_synonyms_synonyms} ts
+                where ts.entity_id = td.tid)";
+    db_query($sql);
+
+}
+
+function search_all_url_outbound_alter(&$path, &$options, $original_path) {
+  // Change all requests for 'search/node/x' to 'search_all/x'.
+  
+  if (preg_match('|^search/node(/.*)|', $path, $matches)) {
+      $path = 'search_all_search'. $matches[1];
+      return;
+    }
+}
+
+function search_all_user_filter($form_state) {
+  $form = array();
+  if (!isset($_SESSION['search_all_user_dates'])) { $_SESSION['search_all_user_dates'] = array() ;	}
+  $session = $_SESSION['search_all_user_dates'];
+  if (!empty($session[0])){
+   
+  }
+  else {
+      $session[0] = 0;
+      $_SESSION['search_all_user_dates'][0] = $session[0];
+  }
+
+  if (!empty($session[1])){
+   
+  }
+  else {
+    $session[1] = date("Y-m-d H:i:s");
+    $_SESSION['search_all_user_dates'][1] = $session[1];
+  }
+  $sdate = $session[0];
+  $edate = $session[1];
+
+  $form['filter'] = array(
+  '#type' => 'fieldset',
+  '#title' => t('Filter by date range'),
+  '#prefix' => '<div class="date_inline">',
+  '#suffix' => '</div">',
+   );
+  
+  $form['filter']['start'] = array(
+  '#type' => 'date_popup',
+  '#title' => t('Start'),
+  '#default_value' => $sdate,
+  '#date_format' => 'Y-m-d',
+  '#date_year_range' => '-100:+0',
+  );
+  
+  $form['filter']['end'] = array(
+  '#type' => 'date_popup',
+  '#title' => t('End'),
+  '#default_value' => $edate,
+  '#date_format' => 'Y-m-d',
+  '#date_year_range' => '-100:+0',
+  );
+
+  $form['filter']['filter'] = array(
+    '#type' => 'submit',
+    '#value' => t('Filter'),
+  );
+  
+  $form['filter']['reset'] = array(
+    '#type' => 'submit',
+    '#value' => t('Reset'),
+  );
+
+  return $form;
+}
+
+function search_all_user_filter_validate($form, $form_state) {}
+
+function search_all_user_filter_submit($form, &$form_state) {
+  /*
+   * Store form info into session variables
+   */
+    $op = $form_state['values']['op'];
+    switch ($op) {
+      case t('Filter'):
+        $dstart = $form_state['values']['start'];
+        $dend = $form_state['values']['end'] ;
+        break;
+      case t('Reset'):
+        $dstart = date("Y-m-d H:i:s",mktime(0,0,0,10,26,2010));
+        $dend = date("Y-m-d H:i:s");
+        break;
+    }
+    $_SESSION['search_all_user_dates'][0] = $dstart;
+    $_SESSION['search_all_user_dates'][1] = $dend;
+    return 'admin/reports/search_allresults' ;
+  }
+
+function search_all_results_info(){
+  $form = drupal_get_form('search_all_user_filter');
+  $out = drupal_render($form);
+  $dmystart = strtotime($_SESSION['search_all_user_dates'][0]);
+  $dmyend = strtotime($_SESSION['search_all_user_dates'][1]);
+  drupal_add_css(drupal_get_path('module', 'search_all') .'/search_all.css');
+  
+  $headers = array(
+         array('data' => t('Search Phrase&nbsp;&nbsp;'), 'field' => 'term'),
+         array('data' => t('Times Sought&nbsp;&nbsp;'), 'field' => 'counter', 'sort' => 'desc'),
+         array('data' => t('Current # <br />Promotions&nbsp;&nbsp;'), 'field' => 'promotions'),
+         array('data' => t('Tagged # <br />Results&nbsp;&nbsp;'), 'field' => 'tagged'),
+         array('data' => t('Other # <br />Returns&nbsp;&nbsp;'), 'field' => 'returns'),
+         );
+    $select = db_select('search_all', 'h')->extend('PagerDefault');
+    $select->limit(10);
+    $select->extend('TableSort')->orderByHeader($headers);
+    $select->leftjoin('search_all_data','t','t.term = h.term');
+    $select->addField('h','term');
+    $select->addExpression('COUNT(h.term)', 'counter');
+    $select->addField('t','promotions');
+    $select->addField('t','tagged');
+    $select->addField('t', 'returns');
+    $select->condition('h.date',array($dmystart,$dmyend),'BETWEEN');
+    
+    $select->groupBy('h.term');
+    $results = $select->execute();
+
+    $out .= "<div><h2>Search Summary</h2>";
+    $link = '<a rel="nofollow" class="print-page" title="Display a printer-friendly version of this page."
+          href="/print/admin/reports/search_allresults"><img width="16" height="16" class="print-icon print-icon-margin"
+          title="Printer-friendly version" alt="Printer-friendly version"
+          src="/sites/all/modules/print/icons/print_icon.gif"/>Printer-friendly version</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+    $out .= "<div align='center'>$link</div>" ;
+    $rows = array();
+    foreach ($results as $result) {
+      $spacer = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+      $rows[] = array(
+        t($result->term),
+        $spacer.$result->counter,
+        $spacer.$result->promotions,
+        $spacer.$result->tagged,
+        $spacer.$result->returns
+        );
+    }
+    $out .= theme('table', array(
+                'header' => $headers,
+                'rows' => $rows,
+                'attributes' => array('class' => array('search_alltable'))
+            ));
+    $out .= "</div>";
+    $out .= theme('pager', array('tags' => array()));
+    return $out;
+}
+
+function search_all_page($keys){
+  if (isset($_SESSION['my_tid'][0])){$_SESSION['my_tid'][0]=0;}
+  $nsmi_table = 'field_data_field_nsmi_category';
+  $nsmi_field = 'field_nsmi_category_tid';
+  global $user;
+  global $base_url;
+  $is_advocate = $_SESSION['is_advocate'][0];
+  if ($keys=='sites'){return"";}
+  drupal_add_js(array('mylawsearch' => $keys), 'setting');
+  $results = array();
+    if ($is_advocate){
+        $searchtypes = variable_get('search_all_advlibtypes', array());
+    }
+    else {
+        $searchtypes = variable_get('search_all_libtypes', array());
+        if (user_is_logged_in()){
+            $ctypes1 = array_values(variable_get('search_all_libtypes', array()));
+            $ctypes2 = array_values(variable_get('search_all_advlibtypes', array()));
+            $searchtypes = array_merge($ctypes1,$ctypes2);
+        }
+    }
+  search_all_types($searchtypes);
+//  $searchtypes = array('link','page','legal_resource','news','pdf');
+//  $searchtypes = variable_get('search_all_types', array());
+  $total = 1;
+  $promocount = 0;
+  $tagcount = 0;
+  $drupalsearchcount = 0;
+  $findfilecount = 0;
+  $mylimit = 10;
+  $promo_limit = 0;
+  $tag_limit = 0;
+  $drp_limit = 0;
+  $output = '';
+  $promo_output = '';
+  $tagged_output = '';
+  $drupal_output = '';
+  $nsmi_output = '';
+  $file_output = '';
+  $sids = array();
+  $sids[] = 0;
+  $is_advocate = $_SESSION['is_advocate'][0];
+  $output = '';
+  // Get array of cleaned up keywords
+  $query = db_select('search_index', 'i', array('target' => 'slave'))->extend('search_allQuery');
+  $query->SearchExpression($keys,'search_all');
+  $query->parseSearchExpression();
+  $mywords = $query->words;
+  $db_or = db_or();
+  $subquery = db_select('field_data_synonyms_synonyms','s');
+  $subquery->addField('s','entity_id','tid');
+  $subquery->condition('s.synonyms_synonyms_value',$keys);
+  $findterm = $subquery->countQuery()->execute()->fetchField();
+  if(! $findterm){
+    // Get a reference to current conditions
+    $conditions =& $subquery->conditions();
+    // Reset the condition array. It needs a default #conjunction for which AND is fine
+    $conditions = array('#conjunction' => 'AND');
+    $db_or->condition('s.synonyms_synonyms_value',$keys);
+    foreach($mywords as $word){
+      if (strlen($word)<3){continue;}
+      $db_or->condition('s.synonyms_synonyms_value', $word , 'LIKE');
+    }
+    $subquery->condition($db_or);
+  }
+  $subtagquery = db_select('field_data_field_promote_freetags','f');
+  $subtagquery->addField('f','entity_id','sid');
+  $subtagquery->join("taxonomy_term_data",'t','t.tid=f.field_promote_freetags_tid');
+  $subtagquery->join("node","n","n.nid=f.entity_id");
+  $subtagquery->condition('t.name',$keys);
+  $subtagquery->addExpression(0,"score");
+  $subtagquery->addExpression("'promo'","type");
+  $subtagquery->addExpression(0,"calculated_score");
+  $subtagquery->addExpression("'promo'","word");
+  $subtagquery->addField("n","title");
+  $findtag = $subtagquery->countQuery()->execute()->fetchField();
+  $db_or1 = db_or();
+  if(! $findtag){
+    // Get a reference to current conditions
+    $conditions =& $subtagquery->conditions();
+    // Reset the condition array. It needs a default #conjunction for which AND is fine
+    $conditions = array('#conjunction' => 'AND');
+    $db_or1->condition('t.name',$keys);
+    foreach($mywords as $word){
+      if (strlen($word)<3){continue;}
+      $db_or1->condition('t.name', $word , 'LIKE');
+    }
+    $subtagquery->condition($db_or1);
+  }
+  $subtagquery->condition('n.type',$searchtypes,'IN');
+  $promoquery = db_select('field_data_field_sendtotop','p');
+  $promoquery->addField('p','entity_id','sid');
+  $promoquery->addExpression(0,"score");
+  $promoquery->addExpression("'promo'","type");
+  $promoquery->addExpression(0,"calculated_score");
+  $promoquery->addExpression("'promo'","word");
+  $promoquery->join('node','n','n.nid = p.entity_id');
+  $promoquery->addField('n', 'title');
+  $promoquery->join('field_data_field_promotags','t','n.nid = t.entity_id');
+  $promoquery
+    ->condition('n.type',$searchtypes,'IN')
+    ->condition('p.field_sendtotop_value',1,'=')
+    ->condition('t.field_promotags_tid',$subquery,'IN')
+    ->groupBy('n.title');
+  //$promoquery->union($subtagquery);
+  $sortedquery = Database::getConnection()
+  ->select($promoquery->union($subtagquery))
+  ->fields(NULL, array('sid', 'score','type','calculated_score','word','title'))
+  ->orderBy('title');
+  $search_allPromofind = $sortedquery->execute();
+  $promocount = $search_allPromofind->rowCount();
+  if ($promocount>0){
+    $promo_output = search_all_searchoutput($search_allPromofind, "promo", $keys, $sids, TRUE, $promo_limit);
+    $promo_output .= "</div>";
+  }
+  $tquery = db_select('field_data_field_tags','tg');
+  $tquery->addField('tg','field_tags_tid','tid');
+  $tquery->join('taxonomy_term_data','td','td.tid = tg.field_tags_tid');
+  $tquery->condition('td.name',$keys);
+  $findtterm = $tquery->countQuery()->execute()->fetchField();
+  if(! $findtterm){
+    $db_or2 = db_or();
+    // Get a reference to current conditions
+    $conditions =& $tquery->conditions();
+    // Reset the condition array. It needs a default #conjunction for which AND is fine
+    $conditions = array('#conjunction' => 'AND');
+    $db_or2->condition('td.name',$keys);
+    foreach($mywords as $word){
+      if (strlen($word)<3){continue;}
+      $db_or2->condition('td.name', $word , 'LIKE');
+    }
+    $tquery->condition($db_or2);
+  }
+  $tagquery = db_select('field_data_field_tags', 't');
+  $tagquery->addField('t','entity_id','sid');
+  $tagquery->addExpression(0,"score");
+  $tagquery->addExpression("'promo'","type");
+  $tagquery->addExpression(0,"calculated_score");
+  $tagquery->addExpression("'promo'","word");
+  $tagquery->join('node','n','n.nid = t.entity_id');
+  $tagquery
+    ->condition('t.bundle',$searchtypes,'IN')
+    ->condition('t.field_tags_tid',$tquery,'IN')
+    ->condition('t.entity_id',$sids,'NOT IN')
+    ->range(0,$mylimit)
+    ->orderBy('n.sticky','DESC')
+    ->groupBy('t.entity_id');
+  $bds = dpq2($tagquery,true);
+  $search_allTagfind = $tagquery->execute();
+  $tagcount = $search_allTagfind->rowCount();
+  $newhead = true;
+  $mylimit = $mylimit - $tagcount;
+  if ($mylimit < 1){$mylimit = 0;}
+  if ($tagcount>0){
+    $srchtype = "only";
+//    if ($promocount==0){$srchtype = "only";}
+    $tagged_output .= search_all_searchoutput($search_allTagfind, $srchtype, $keys, $sids, true, $tag_limit);  
+    $tagged_output .="</div>";
+    $newhead = false;
+  }
+  if ($mylimit > 0){
+    // Get NSMI Synonym matches, not featured
+    $nsmiquery = db_select($nsmi_table, 't');
+    $nsmiquery->addField('t','entity_id','sid');
+    $nsmiquery->addExpression(0,"score");
+    $nsmiquery->addExpression("'promo'","type");
+    $nsmiquery->addExpression(0,"calculated_score");
+    $nsmiquery->addExpression("'promo'","word");
+    $nsmiquery->join('node','n','n.nid = t.entity_id');
+    $nsmiquery
+        ->condition('t.bundle',$searchtypes,'IN')
+        ->condition($nsmi_field,$subquery,'IN')
+        ->condition('t.entity_id',$sids,'NOT IN')
+        ->range(0,$mylimit)
+        ->orderBy('n.sticky','DESC')
+        ->groupBy('t.entity_id');
+    $bds = dpq2($nsmiquery,true);
+    $search_NSMIfind = $nsmiquery->execute();
+    $nsmicount = $search_NSMIfind->rowCount();
+    if ($nsmicount>0){
+        $srchtype = "only";
+        $nsmi_output .= search_all_searchoutput($search_NSMIfind, $srchtype, $keys, $sids, $newhead, $nsmi_limit);  
+        $nsmi_output .="</div>";
+    }
+  }
+  
+  // Do Drupal Node Search
+  $my_sql = "CREATE TEMPORARY TABLE bds_drupal (
+        score float,
+        sid int(10),
+        word varchar(50),
+        type varchar(16),
+        calculated_score double)";
+  db_query($my_sql);
+
+  $drpquery = db_select('search_index', 'i', array('target' => 'slave'))->extend('search_allQuery')->extend('PagerDefault');
+  $drpquery->addField('i','score');
+  $drpquery->join('node', 'n', 'n.nid = i.sid');
+  $drpquery
+    ->condition('n.status', 1)
+    ->condition('n.type',$searchtypes)
+    ->condition('i.sid',$sids,'NOT IN')   
+    ->addTag('node_access')
+    ->SearchExpression($keys, 'node');
+  
+  // Insert special keywords.
+  $drpquery->setOption('type', 'n.type');
+  $drpquery->setOption('language', 'n.language');
+  if ($drpquery->setOption('term', 'ti.tid')) {
+    $drpquery->join('taxonomy_index', 'ti', 'n.nid = ti.nid');
+  }
+  // Only continue if the first pass query matches.
+  if ($drpquery->executeFirstPass()) {
+
+    _node_rankings($drpquery);
+    $drpquery
+        ->orderBy('n.sticky','DESC')
+        ->groupBy('i.sid');
+    $drupalsearchcount = $drpquery->countQuery()->execute()->fetchField();
+    
+    $search_allDrupalfind = $drpquery->execute();
+    if ($drupalsearchcount > 0){
+      $my_sql = "INSERT INTO bds_drupal " . dpq2($drpquery,true) ;
+      db_query($my_sql);
+      db_query('drop table if exists bdscheck');
+      db_query('create table if not exists bdscheck select * from bds_drupal');
+    }
+  }
+
+  if (db_table_exists('search_api_db_attached_files_attachments_field_attached_file')){
+    $filequery = db_select('search_api_db_attached_files_attachments_field_attached_file','fl');
+    $filequery->addField('fl','score');
+    $filequery->addExpression("'attachment'","type");
+    $filequery->addField('fl','item_id','sid');
+    $filequery->join('node', 'n', 'n.nid = fl.item_id');
+    $filequery->leftJoin('search_total', 't', 't.word = fl.word');
+    $filequery
+        ->condition('n.status', 1)
+        ->condition('n.type',$searchtypes,"IN");
+    $db_and = db_and();
+    $k = 0;
+    foreach($mywords as $word){
+        if (strlen($word)<3){continue;}
+        $k++;
+        $fld = "q".$k;
+        ${$fld} = db_select('search_api_db_attached_files_attachments_field_attached_file','fl'.$k);
+        ${$fld}->addField('fl'.$k, "item_id");
+        ${$fld}->condition('fl'.$k.'.word', $word,"LIKE");
+        $db_and->condition('fl.item_id',${$fld},'IN');
+    }
+
+    $db_or2 = db_or();
+    // Get a reference to current conditions
+    $conditions =& $filequery->conditions();
+    // Reset the condition array. It needs a default #conjunction for which AND is fine
+    $conditions = array('#conjunction' => 'AND');
+    $db_or2->condition('fl.word',$keys);
+    foreach($mywords as $word){
+        if (strlen($word)<3){continue;}
+        $db_or2->condition('fl.word', $word , 'LIKE');
+    }
+    $filequery->condition($db_or2);
+    $filequery->condition($db_and);
+    $filequery
+        ->condition('n.status', 1)
+        ->condition('n.nid',$sids,'NOT IN')  
+        ->condition('n.type',$searchtypes,"IN");
+
+    $normquery = clone $filequery;
+    $normquery->addExpression("SUM(fl.score * t.count)", "wordscore");
+    $normalize = $normquery->countQuery()->execute()->fetchField();
+    if ($normalize == 0){
+        $expr = ' SUM(fl.score * t.count)';
+    }
+    else {
+        $expr = (1000.0 / $normalize) . ' * SUM(fl.score * t.count)';
+    }
+
+    $filequery->addField('fl','word');
+    $filequery->addExpression($expr, "calculated_score");
+    $filequery->groupBy("fl.item_id");
+    $filequery->orderBy('calculated_score','DESC');
+    $findfilecount = $filequery->countQuery()->execute()->fetchField();
+    //watchdog('bds',dpq2($filequery,true));
+    if ($findfilecount>0){
+        $my_sql = "INSERT INTO bds_drupal " . dpq2($filequery,true) ;
+        db_query($my_sql);
+
+    }
+  }
+  $filesearchfind = db_query("SELECT * FROM bds_drupal GROUP BY sid ORDER BY calculated_score DESC LIMIT 10");
+  $istrue = false;
+  
+  if ($tagcount==0){$istrue = true;}
+  $srchtype = "drupal";
+  if ($promocount+$tagcount+$nsmicount==0){$srchtype = "only";}
+  $drupal_output .= search_all_searchoutput($filesearchfind, $srchtype, $keys, $sids, $istrue);
+  
+  if($drupalsearchcount + $findfilecount > 10){
+      $drupal_output .= "<div id='more-results'>
+           <a class='ask-button' href='".$base_url."/search_all_full/".$keys."'>Complete Additional Results</a></div>";
+  }
+  if($drupalsearchcount + $findfilecount > 0){
+      $drupal_output .= "</div>";
+  }
+  $totalcount = $promocount+$tagcount+$nsmicount+$drupalsearchcount+$findfilecount;
+
+  //update search_alles_data to show number of unpromoted returns for this key
+  $search_all_id = db_query("select qid from {search_all_data} where term = :term", array(':term' => $keys ))->fetchField();
+  if(! $search_all_id){
+        $search_all_id = db_insert("search_all_data")
+            ->fields(array(
+                'term' => $keys,
+                'counter' => 0,))
+            ->execute();
+  }
+  db_update('search_all_data')
+    ->fields(array(
+        'promotions' => $promocount,
+        'tagged'=>$tagcount,
+        'returns' => $drupalsearchcount,))
+    ->expression('counter', 'counter + :counter', array(':counter' => 1))
+    ->condition('qid', $search_all_id, '=')
+    ->execute();
+  db_insert("search_all")
+        ->fields(array(
+            'term' => $keys,
+            'date' => time()))
+        ->execute();
+
+  if($totalcount == 0){
+      $output .= "<div id='no_search_all_results'>";
+      $output .= '<p><h2>No search results were found for <em>' . $keys . '</em></h2></p>';
+      $output .= "<p style='padding-left:30px;'>Please try another search</p>";
+      $output .= "</div>";
+  }
+  else {
+    if (user_is_logged_in()){
+        $form = drupal_get_form("search_all_advocate");
+        $output .= '<div id="search_all-set-advocate"><div id="search_all-button-title">Advocate Articles Only</div>' . 
+                                        drupal_render($form) . "<br /></div>";
+    }
+    $output .= "<div id='search_allsearchresults' >" . 
+                        $promo_output .  $tagged_output . $nsmi_output . $drupal_output . "</div>" ;
+  }
+  return $output;
+}
+
+function search_all_searchoutput($find, $displaytype, $keys, &$sids, $addhead = TRUE, $limitshow=0){
+  global $user;
+  $results = array();
+  $runcount = 0;
+  foreach ($find as $item) {
+    $curl = "";
+    $runcount = $runcount + 1;
+    if($limitshow>0 and $runcount>$limitshow){break;}
+    if($displaytype=='related'){$iscore = 1;}
+    else{$iscore=$item->score;}
+    // Adjust page title to show term searched for 
+    $sids[] = $item->sid ;
+    $pic = "";
+    $titl = '';
+    $total = 1;
+    $multiplier = 1;
+    $node = node_load($item->sid);
+    $sql = "SELECT field_self_help_category_tid
+                FROM field_data_field_self_help_category
+                WHERE entity_id = " . $node->nid . " LIMIT 1";
+    $self_help = db_query($sql)->fetchField();
+    if (!isset($node->title) || $node->title == ""){continue;}
+    $sql = "SELECT filename, uri, filemime FROM file_managed 
+            WHERE fid IN 
+                (SELECT field_attached_file_fid from field_data_field_attached_file 
+                    WHERE entity_id = " . $node->nid . ") LIMIT 1";
+    $node_file = db_query($sql)->fetchField();
+    $file_mime = db_query($sql)->fetchField(2);
+    if (isset($node->field_url['und'])){
+        $curl = $node->field_url['und'][0]['safe_value'];
+    }
+//    if ($node->type =="jimsmailbag"){$multiplier = 0.1;}
+    if ( $iscore == 0) {
+        if ($multiplier > 1) {
+            $item->score = $multiplier ;
+        }
+    }
+    $extra = '';
+    if ($curl>"") {
+      $myurl = $curl ; 
+      $pic = "/images/globe.png";
+      $titl = "External Website Resource";
+    }
+    else {
+      $myurl = 'node/'. $item->sid ; 
+      $pic="/images/ours.png";
+      $titl = "KYJ Website Resource";
+    }
+    if ($node_file AND ($displaytype=='drupal' || $displaytype=='only') ){
+        switch ($file_mime){
+            case 'application/pdf':
+                $pic = "/images/pdf.png";
+                $myurl = "sites/default/files/" . $node_file;
+                $titl = "Link to KYJ PDF file";
+                break;
+            case 'application/msword':
+                $pic = "/images/word.jpg";
+                $myurl = "sites/default/files/" . $node_file;
+                $titl = "Link to KYJ Word file";
+                break;
+            case 'application/vnd.ms-powerpoint':
+                $pic = "/images/ppt.jpg";
+                $myurl = "sites/default/files/" . $node_file;
+                $titl = "Link to KYJ PowerPoint file";
+                break;
+        }
+    }
+    if ($self_help){
+        $pic = "/images/selfhelp.png";
+        $titl = "Self-help form";
+    }
+//    if ($node->type =="jimsmailbag"){$pic = "/images/mail.gif";}
+    if (in_array('Site Manager', $user->roles) ) {
+        $myurl = 'node/'. $item->sid ;
+    }
+    $extra = '';
+    if ($node->body){$body = $node->body['und'][0]['value'];}
+    else {$body = "";}
+    $results[] = array(
+        'link' => url($myurl),
+         'type' => $node->type,
+         'title' => $node->title,
+         'user' => '',
+         'date' => $node->changed,
+         'node' => $node,
+         'extra' => $extra,
+         'score' => ( $iscore * $multiplier) ,
+         'snippet' => search_all_excerpt($keys, $body),
+         'display' => $displaytype,
+         'pict' => $pic,
+         'titl' => $titl
+    );
+  }   
+  if(count($results)==0){return "";}
+  switch($displaytype){
+      case 'promo':
+          $headline = 'Featured resources for <em>' . $keys . '</em>';
+          break;
+      case 'only':
+          $headline = 'These resources were tagged with terms for <em>' . $keys . '</em>';
+          break;
+      case 'drupal':
+          $headline = 'These pages also mention <em>' . $keys . '</em>';
+          break;
+  }
+  $showid = $displaytype . 'results';
+  $showh2 = $displaytype . 'head';
+  if($addhead){
+    $output .= "<h2 id='" . $showh2 . "' class='searchaccordian'>$headline</h2>" ;
+    $output .= "<div id='" . $showid . "' >" ;
+  }
+  foreach ($results as $mr) {
+    $caddpic = "";
+    if ( $mr['pict'] > "") {
+        $caddpic = '<img title="' . $mr['titl'] . '" src="' . base_path() .
+                drupal_get_path('module', 'search_all') . $mr['pict'] . '" />' ;
+    }
+    if ($mr['type']=='libdataprivate' || $mr['type']=='pageprivate'){
+        $output .= "<div class='advocate searchresults'>";
+    }
+    else {
+        $output .= "<div class='searchresults'>";
+    }
+    $output .= '<dt class="title-promo">' ;
+    $output .= $caddpic . " " .'<a href="' . $mr['link'] . '">' .  $mr['title'] . '</a>' ;
+    $output .= '</dt>' ;
+    $output .= '<dd>' ;
+    if ( $mr['extra'] ) {
+         $output .=  $mr['extra'] . '<br />';
+    }
+    if ( $mr['snippet'] ) {
+        $output .= $mr['snippet'] ;
+        $output .=  '<br />';
+    }
+    else {$output .= '<br />';}
+    $output .= '</dd>' ;
+    $output .= "</div>";
+  }
+  return $output; 
+  
+}
+
+function search_all_pagefull($keys){
+  
+  $sids = array();
+  $sids[] = 0;
+  
+  // Get array of cleaned up keywords
+  $query = db_select('search_index', 'i', array('target' => 'slave'))->extend('search_allQuery');
+  $query->SearchExpression($keys,'search_all');
+  $query->parseSearchExpression();
+  $mywords = $query->words;
+  $searchtypes = array('link','page','legal_resource','news','pdf');
+  $my_sql = "CREATE TEMPORARY TABLE bds_drupal (
+        score float,
+        sid int(10),
+        word varchar(50),
+        type varchar(16),
+        calculated_score double)";
+  db_query($my_sql);
+
+  $drpquery = db_select('search_index', 'i', array('target' => 'slave'))->extend('search_allQuery')->extend('PagerDefault');
+  $drpquery->addField('i','score');
+  $drpquery->join('node', 'n', 'n.nid = i.sid');
+  $drpquery
+    ->condition('n.status', 1)
+    ->condition('n.type',$searchtypes,"IN")
+    ->addTag('node_access')
+    ->SearchExpression($keys, 'node');
+  
+  // Insert special keywords.
+  $drpquery->setOption('type', 'n.type');
+  $drpquery->setOption('language', 'n.language');
+  // Only continue if the first pass query matches.
+  if ($drpquery->executeFirstPass()) {
+
+    _node_rankings($drpquery);
+    $drpquery
+        ->orderBy('n.sticky','DESC')
+        ->groupBy('i.sid');
+    $drupalsearchcount = $drpquery->countQuery()->execute()->fetchField();
+    
+    $search_allDrupalfind = $drpquery->execute();
+    if ($drupalsearchcount > 0){
+      $my_sql = "INSERT INTO bds_drupal " . dpq2($drpquery,true) ;
+      db_query($my_sql);
+    }
+  }
+  
+  
+
+  $filequery = db_select('search_api_db_attached_files_attachments_field_attached_file','fl');
+  $filequery->addField('fl','score');
+  $filequery->addExpression("'attachment'","type");
+  $filequery->addField('fl','item_id','sid');
+  $filequery->join('node', 'n', 'n.nid = fl.item_id');
+  $filequery->leftJoin('search_total', 't', 't.word = fl.word');
+  $filequery
+    ->condition('n.status', 1)
+    ->condition('n.type',$searchtypes,"IN");
+  $db_and = db_and();
+  $k = 0;
+  foreach($mywords as $word){
+    $k++;
+    $fld = "q".$k;
+    ${$fld} = db_select('search_api_db_attached_files_attachments_field_attached_file','fl'.$k);
+    ${$fld}->addField('fl'.$k, "item_id");
+    ${$fld}->condition('fl'.$k.'.word', $word,"LIKE");
+    $db_and->condition('fl.item_id',${$fld},'IN');
+  }
+  
+  
+  $findfilecount = $filequery->countQuery()->execute()->fetchField();
+  $db_or2 = db_or();
+  // Get a reference to current conditions
+  $conditions =& $filequery->conditions();
+  // Reset the condition array. It needs a default #conjunction for which AND is fine
+  $conditions = array('#conjunction' => 'AND');
+  $db_or2->condition('fl.word',$keys);
+  foreach($mywords as $word){
+      $db_or2->condition('fl.word', $word , 'LIKE');
+  }
+  $filequery->condition($db_or2);
+  $filequery->condition($db_and);
+  $filequery
+    ->condition('n.status', 1)
+    ->condition('n.type',$searchtypes,"IN");
+
+  $normquery = clone $filequery;
+  $normquery->addExpression("SUM(fl.score * t.count)", "wordscore");
+  $normalize = $normquery->countQuery()->execute()->fetchField();
+  if ($normalize == 0){
+    $expr = ' SUM(fl.score * t.count)';
+  }
+  else {
+      $expr = (1000.0 / $normalize) . ' * SUM(fl.score * t.count)';
+  }
+
+  $filequery->addField('fl','word');
+  $filequery->addExpression($expr, "calculated_score");
+  $filequery->groupBy("fl.item_id");
+  $filequery->orderBy('calculated_score','DESC');
+
+  if ($findfilecount>0){
+    $my_sql = "INSERT INTO bds_drupal " . dpq2($filequery,true) ;
+    db_query($my_sql);
+    
+  }
+    
+    $query = db_select("bds_drupal","b")->extend('PagerDefault');    
+    $query->fields('b');
+    $query
+        ->groupBy("sid")
+        ->orderBy("calculated_score");
+    $filesearchfind = $query->execute();
+    $output = "<div id='full_results'>";
+    $output .= '<p><h4>Complete text and file search results for <em>' . $keys . '</em></h4></p></div>';
+    $output .= search_all_searchoutput($filesearchfind, "drupal", $keys, $sids, true);
+    $output .= "</div>";
+  // Return the output with the pager attached to it.  The pager
+  // is the box underneath the table that allows people to jump
+  // to the next page.
+  $output .= theme('pager', array('tags' => array()));
+  return $output;
+}
+
+function search_all_keyform($form, &$form_state)  {
+  //$form_default = t('Enter keyword or phrase');
+  $form['search_all_key'] = array(
+      '#title' => t('Search Box'), 
+      '#attributes' => array('class' => array('no-mobile')),
+  );
+  $form['search_all_key']['search_all_term'] = array(
+      '#type' => 'textfield',
+      '#size' => 50,
+      '#attributes' => array(
+              'placeholder' => t('Enter search term')),
+  );
+  $form['search_all_key']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => "",
+    '#weight' => 19,
+  );    
+  return $form;
+}
+
+function search_all_keyform_validate($form, $form_state) {
+  
+}
+function search_all_keyform_submit($form, &$form_state){
+  $search_all_key = search_simplify($form_state['values']['search_all_term']);
+  $form_state['redirect'] = 'search_all/' . $search_all_key;
+}
+
+function search_all_block_info() {
+  $blocks['search_all_search'] = array(
+    'info' => t('search_all Search Box'), //The name that will appear in the block list.
+    'cache' => DRUPAL_CACHE_PER_ROLE, //Default
+  );
+  $blocks['search_all_sidebar_search'] = array(
+    'info' => t('search_all Sidebar Search Box'), //The name that will appear in the block list.
+    'cache' => DRUPAL_CACHE_PER_ROLE, //Default
+  );
+  $blocks['search_all_sidebar_search2'] = array(
+    'info' => t('search_all Sidebar Search Box2'), //The name that will appear in the block list.
+    'cache' => DRUPAL_CACHE_PER_ROLE, //Default
+  );
+
+  return $blocks;
+}  
+
+function search_all_block_view($delta = '') {
+  global $base_url;
+  switch($delta){
+    case 'search_all_search':
+      $form = drupal_get_form("search_all_keyform");
+      $ctext = drupal_render($form);
+      $ctext = "<div id='searchbar'><h3>Need Legal Help?</h3>" . $ctext . "</div>";
+      $block['subject'] = '';
+      $block['content'] = $ctext;
+      return $block;
+    case 'search_all_sidebar_search':
+      $form = drupal_get_form("search_all_keyform");
+      $ctext = drupal_render($form);
+      $ctext = "<div id='side-searchbar'>" . $ctext .'</div>';
+      $block['subject'] = '';
+      $block['content'] = $ctext;
+      return $block;
+    case 'search_all_sidebar_search2':
+      $form = drupal_get_form("search_all_keyform");
+      $ctext = drupal_render($form);
+      $ctext = "<div id='side-searchbar'>" . $ctext .'</div>';
+      $block['subject'] = '';
+      $block['content'] = $ctext;
+      return $block;
+    }    
+}   
+
+function dpq2($query, $return = FALSE, $name = NULL) {
+    $query->preExecute();
+    $sql = (string) $query;
+    $quoted = array();
+    $connection = Database::getConnection();
+    foreach ((array)$query->arguments() as $key => $val) {
+      $quoted[$key] = $connection->quote($val);
+    }
+    $sql = strtr($sql, $quoted);
+    if ($return) {
+      return $sql;
+    }
+    dpm($sql, $name);
+  return ($return ? NULL : $query);
+}
+function search_all_excerpt($keys, $text) {
+  // We highlight around non-indexable or CJK characters.
+  $boundary = '(?:(?<=[' . PREG_CLASS_UNICODE_WORD_BOUNDARY . PREG_CLASS_CJK . '])|(?=[' . PREG_CLASS_UNICODE_WORD_BOUNDARY . PREG_CLASS_CJK . ']))';
+
+  // Extract positive keywords and phrases
+  preg_match_all('/ ("([^"]+)"|(?!OR)([^" ]+))/', ' ' . $keys, $matches);
+  $keys = array_merge($matches[2], $matches[3]);
+
+  // Prepare text by stripping HTML tags and decoding HTML entities.
+  $text = strip_tags(str_replace(array('<', '>'), array(' <', '> '), $text));
+  $text = decode_entities($text);
+
+  // Slash-escape quotes in the search keyword string.
+  array_walk($keys, '_search_excerpt_replace');
+  $workkeys = $keys;
+
+  // Extract fragments around keywords.
+  // First we collect ranges of text around each keyword, starting/ending
+  // at spaces, trying to get to 256 characters.
+  // If the sum of all fragments is too short, we look for second occurrences.
+  $ranges = array();
+  $included = array();
+  $foundkeys = array();
+  $length = 0;
+  while ($length < 256 && count($workkeys)) {
+    foreach ($workkeys as $k => $key) {
+      if (strlen($key) < 3) {
+        unset($workkeys[$k]);
+        unset($keys[$k]);
+        continue;
+      }
+      if ($length >= 256) {
+        break;
+      }
+      // Remember occurrence of key so we can skip over it if more occurrences
+      // are desired.
+      if (!isset($included[$key])) {
+        $included[$key] = 0;
+      }
+      // Locate a keyword (position $p, always >0 because $text starts with a
+      // space). First try bare keyword, but if that doesn't work, try to find a
+      // derived form from search_simplify().
+      $p = 0;
+      if (preg_match('/' . $boundary . $key . $boundary . '/iu', $text, $match, PREG_OFFSET_CAPTURE, $included[$key])) {
+        $p = $match[0][1];
+      }
+      else {
+        $info = search_simplify_excerpt_match($key, $text, $included[$key], $boundary);
+        if ($info['where']) {
+          $p = $info['where'];
+          if ($info['keyword']) {
+            $foundkeys[] = $info['keyword'];
+          }
+        }
+      }
+      // Now locate a space in front (position $q) and behind it (position $s),
+      // leaving about 60 characters extra before and after for context.
+      // Note that a space was added to the front and end of $text above.
+      if ($p) {
+        if (($q = strpos(' ' . $text, ' ', max(0, $p - 61))) !== FALSE) {
+          $end = substr($text . ' ', $p, 80);
+          if (($s = strrpos($end, ' ')) !== FALSE) {
+            // Account for the added spaces.
+            $q = max($q - 1, 0);
+            $s = min($s, strlen($end) - 1);
+            $ranges[$q] = $p + $s;
+            $length += $p + $s - $q;
+            $included[$key] = $p + 1;
+          }
+          else {
+            unset($workkeys[$k]);
+          }
+        }
+        else {
+          unset($workkeys[$k]);
+        }
+      }
+      else {
+        unset($workkeys[$k]);
+      }
+    }
+  }
+
+  if (count($ranges) == 0) {
+    // We didn't find any keyword matches, so just return the first part of the
+    // text. We also need to re-encode any HTML special characters that we
+    // entity-decoded above.
+    return check_plain(truncate_utf8($text, 256, TRUE, TRUE));
+  }
+
+  // Sort the text ranges by starting position.
+  ksort($ranges);
+
+  // Now we collapse overlapping text ranges into one. The sorting makes it O(n).
+  $newranges = array();
+  foreach ($ranges as $from2 => $to2) {
+    if (!isset($from1)) {
+      $from1 = $from2;
+      $to1 = $to2;
+      continue;
+    }
+    if ($from2 <= $to1) {
+      $to1 = max($to1, $to2);
+    }
+    else {
+      $newranges[$from1] = $to1;
+      $from1 = $from2;
+      $to1 = $to2;
+    }
+  }
+  $newranges[$from1] = $to1;
+
+  // Fetch text
+  $out = array();
+  foreach ($newranges as $from => $to) {
+    $out[] = substr($text, $from, $to - $from);
+  }
+
+  // Let translators have the ... separator text as one chunk.
+  $dots = explode('!excerpt', t('... !excerpt ... !excerpt ...'));
+
+  $text = (isset($newranges[0]) ? '' : $dots[0]) . implode($dots[1], $out) . $dots[2];
+  $text = check_plain($text);
+
+  // Slash-escape quotes in keys found in a derived form and merge with original keys.
+  array_walk($foundkeys, '_search_excerpt_replace');
+  $keys = array_merge($keys, $foundkeys);
+
+  // Highlight keywords. Must be done at once to prevent conflicts ('strong' and '<strong>').
+  $text = preg_replace('/' . $boundary . '(' . implode('|', $keys) . ')' . $boundary . '/iu', '<strong>\0</strong>', $text);
+  return $text;
+}

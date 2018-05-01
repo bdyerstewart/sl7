@@ -1,0 +1,11 @@
+name = "Search All"
+description = "Extended Search including featured search and attached files"
+
+core = 7.x
+project = "Search All"
+
+dependencies[] = synonyms
+package = Search
+stylesheets[all][] = search_all.css
+scripts[] = search_all.js
+files[] = search_all.admin.inc

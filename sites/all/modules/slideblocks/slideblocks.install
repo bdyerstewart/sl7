@@ -1,0 +1,89 @@
+<?php
+
+function slideblocks_schema(){
+    $schema['slide_blocks'] = array(
+      'description' => 'TODO: please describe this table!',
+      'fields' => array(
+        'sid' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'serial',
+          'unsigned' => TRUE,
+          'size' => 'big',
+          'not null' => TRUE,
+        ),
+        'form_id' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'varchar',
+          'length' => '128',
+          'not null' => FALSE,
+        ),
+        'use_slide' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'int',
+          'size' => 'tiny',
+          'not null' => FALSE,
+        ),
+        'title' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'varchar',
+          'length' => '128',
+          'not null' => FALSE,
+        ),
+        'width' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'int',
+          'not null' => FALSE,
+        ),
+        'tabcolor' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'varchar',
+          'length' => '32',
+          'not null' => FALSE,
+        ),
+        'tabbackcolor' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'varchar',
+          'length' => '16',
+          'not null' => FALSE,
+        ),
+        'panelcolor' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'varchar',
+          'length' => '32',
+          'not null' => FALSE,
+        ),
+        'panelbackcolor' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'varchar',
+          'length' => '16',
+          'not null' => FALSE,
+        ),
+        'weight' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'int',
+          'not null' => FALSE,
+        ),
+        'use_colors' => array(
+          'description' => 'TODO: please describe this field!',
+          'type' => 'int',
+          'size' => 'tiny',
+          'not null' => FALSE,
+        ),
+        'js_calls' => array(
+          'description' => 'List of javascript functions to call',
+          'type' => 'text',
+          'size' => 'normal',
+          'not null' => FALSE,
+        ),
+          
+      ),
+      'primary key' => array('sid'),
+      'unique keys' => array(
+        'sid' => array('sid')
+      ),
+      'indexes' => array(
+        'form_id' => array('form_id'),
+      ),
+    );
+    return $schema;
+}

@@ -1,0 +1,4 @@
+name = Triage AI
+description = Triage integration with Houston AI work
+package = Services
+core = 7.x

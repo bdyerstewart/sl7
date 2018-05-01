@@ -1,0 +1,397 @@
+
+button, input[type="submit"], input[type="reset"], input[type="button"] {
+  background-color: #ccc;
+  box-shadow: 1px 1px 1px 1px #666;
+}
+.ta-nav-bar {
+  height: 30px;
+}
+.triage-restart,
+.triage-slrestart,
+.triage-again {
+  background-color: rgb(86, 112, 172);
+  background-image: none;
+  border-radius: 5px;
+  color: rgb(255, 255, 255);
+  font-size: inherit;
+  height: 25px;
+  margin: 0 10px 0 0;
+  padding: 10px 20px;
+  text-indent: 0;
+  width: 100px;
+  text-align: center;
+}
+.triage-restart a:link,
+.triage-slrestart a:link,
+.triage-again a:link{
+  color: #fff;
+}
+a.triage-restart:link,
+a.triage-slrestart:link,
+a.triage-slrestart:visited,
+a.triage-again:link,
+a.triage-again:visited{
+  color: #fff;
+  text-decoration: none;
+}
+a.triage-restart:hover,
+a.triage-slrestart:hover {
+  color: #fff;
+  background-color: #000;
+}
+.triage-restart2 {
+  background-color: rgb(86, 112, 172);
+  background-image: none;
+  border-radius: 5px;
+  color: rgb(255, 255, 255);
+  font-size: inherit;
+  height: 25px;
+  margin: 0 10px 0 0;
+  padding: 6px 0 0 6px;
+  text-indent: 0;
+  width: 100px;
+}
+.triage-restart2 a:link {
+  color: #fff;
+}
+.triage-restart2 a:visited {
+  color: #fff;
+}
+.triage-restart{
+  float: right !important;
+}
+.triage-again {
+  font-size: 20px;
+  margin: 10px auto 0;
+  min-width: 100px;
+  width: 50%;
+  box-shadow: 1px 1px 1px 1px #000;
+}
+.triage-again a:link,
+.triage-again a:active,
+.triage-again a:visited{
+  text-decoration: none;
+  color: #fff;
+}
+.ta-shadow-box {
+  border: 1px solid #999;
+  padding: 5px 10px;
+  box-shadow: 3px 3px 3px #888;
+}
+.webform-container-inline label {
+  display: inherit;
+}
+.page-node-68030 .webform-component-radios {
+  border-bottom: 1px solid #666;
+}
+.triage-print-email {
+  display: block;
+  float: right;
+  padding-top: 14px;
+  width: 70%;
+}
+.ta-print-buttons input[type="submit"] {
+  padding: 0 10px 2px;
+}
+.triage-print-email .form-item label {
+  font-size: 13px;
+}
+#edit-triage-suggestion {
+  margin-left: 5px;
+  width: 180px;
+}
+#triage_suggestion_submit {
+  width: 70px;
+}
+.triage-step-text {
+  display: none;
+  float: left;
+}
+.triage-step-num {
+  float: left;
+}
+.triage-row {
+  margin: 10px 0;
+  width: 95%;
+}
+.triage-kids .triage-row {
+  line-height: 20px;
+}
+.page-triage #featured-image {
+  display: none;
+}
+.page-triage #main-content {
+  width: 100%;
+}
+#triage-page-wrapper.alt-display {
+  margin-top: 10px;
+  padding: 10px 1% 10px;
+  z-index: 999;
+  width: 94%;
+  left: 0;
+  position: absolute;
+}
+#triage-page-wrapper.alt-display .ta-help-panel {
+  margin-top: 0;
+}
+.ta-main-panel {
+  float: left;
+  padding: 0 0.5%;
+  width: 98%;
+}
+.triage-action-item, .triage-action-form {
+  margin: 10px 0 0;
+}
+.triage-path ul {
+  margin-left: 10px;
+}
+.triage-kids {
+  width: 85%;
+}
+.triage-image > img {
+  height: auto;
+  width: 65px;
+}
+.triage-add-help h4 {
+  background-color: #1d3c72;
+  color: #fff;
+  margin: 0 -10px 10px;
+  padding: 10px;
+  text-align: center;
+}
+.triage-title{
+  margin-top: 20px;
+}
+.page-triage #triage-popup {
+  display: none;
+  opacity: .75;
+}
+.page-triage .fa-2x {
+  font-size: 29px;
+}
+.page-triage-actions-process #triage-popup {
+  display: none;
+}
+.page-triage-actions-process #nav-wrapper {
+  top: 5px;
+}
+.page-triage-actions-process #content-wrapper {
+  background: #fff none repeat scroll 0 0;
+  margin: 5px auto;
+}
+.page-triage-actions-process li.node-readmore a {
+  background-color: #dfdfdf;
+  color: #000;
+  float: right;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 8px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.page-triage-actions-process li.node-readmore a:hover {
+  background-color: #31599B;
+  color: #fff;
+  font-weight: normal;
+  text-shadow: none;
+}
+.home-button {
+  border: 1px solid #000;
+  background-color: #ccc;
+  border-radius: 15px;
+  padding: 5px 20px;
+  width: 65px;
+  text-align: center;
+  margin: 0 0 15px;
+}
+.home-button:hover {
+  background-color: #000;
+}
+.home-button:hover a {
+  color: #fff;
+}
+.home-button a {
+  text-decoration: none;
+  color: #000;
+}
+.home-button a:hover {
+  text-decoration: none;
+  color: #fff;
+}
+.triage-top {
+  padding: 0 5%;
+  width: 90%;
+}
+#edit-triage-print-email {
+  width: 185px;
+}
+.ta-print-buttons input[type="submit"] {
+  padding: 0 10px 2px;
+  margin-bottom: 6px
+}
+#footer-logos,
+#footer-logos2 {
+  text-align: center;
+}
+.ta-main-panel .ta-answers-left{
+  width:100%;
+}
+.ta-main-panel .ta-answers-left .triage-title {
+  float: left;
+  font-size: 20px;
+  margin-left: -10px;
+}
+.ta-main-panel .ta-answers-left .triage-image{
+  float: left;
+}
+
+.ta-help-panel .ta-answers-left {
+  margin-top: 5px;
+  width: 35%;
+}
+.ta-help-panel .ta-answers-right {
+  margin-top: 5px;
+  width: 55%;
+}
+.article-wrapper,.form-wrapper,.classroom-wrapper, .legal-help-wrapper, .video-wrapper,.map-wrapper,problem-wrapper {
+  border: 1px solid #dfdfdf;
+  padding: 0 5px;
+  margin-bottom: 4px;
+}
+.article-wrapper > h4,
+.form-wrapper > h4,
+.classroom-wrapper > h4,
+.legal-help-wrapper > h4,
+.video-wrapper > h4,
+.map-wrapper > h4,
+.problem-wrapper > h4{
+  background-color: #dfdfdf;
+  background-image: url("/sites/all/themes/state7/images/articles.png");
+  background-position: 10px center;
+  background-repeat: no-repeat;
+  background-size: 50px auto;
+  font-size: 28px;
+  padding: 20px 20px 20px 70px;
+  margin: 0 -5px;
+  cursor: pointer;
+}
+.form-wrapper > h4 {
+  background-image: url("/sites/all/themes/state7/images/forms.png");
+}
+.classroom-wrapper > h4 {
+  background-image: url("/sites/all/themes/state7/images/classrooms.png");
+}
+.legal-help-wrapper > h4 {
+  background-image: url("/sites/all/themes/state7/images/legal_help.png");
+}
+.video-wrapper > h4 {
+  background-image: url("/sites/all/themes/state7/images/video.png");
+}
+.map-wrapper > h4 {
+  background-image: url("/sites/all/themes/state7/images/map.png");
+}
+.problem-wrapper > h4 {
+  background-image: url("/sites/all/themes/state7/images/legal_problem.png");
+}
+.article-wrapper h4.expanded::after,
+.form-wrapper h4.expanded::after,
+.classroom-wrapper h4.expanded::after,
+.legal-help-wrapper h4.expanded::after,
+.video-wrapper h4.expanded::after{
+  content: "\f0dd";
+  font-family: fontawesome;
+  float: right;
+}
+.article-wrapper h4.collapsed::after,
+.form-wrapper h4.collapsed::after,
+.classroom-wrapper h4.collapsed::after,
+.legal-help-wrapper h4.collapsed::after,
+.video-wrapper h4.collapsed::after{
+  content: "\f0d9";
+  font-family: fontawesome;
+  float: right;
+}
+.triage-action-item .node h2 a:link{
+  text-decoration: none;
+}
+.legal-help-wrapper .sl-accordion {
+  border: 1px solid #2e6e8d;
+  background-position: 5px 15px;
+  color: #2e6e8d;
+  font-size: 16px;
+  margin-bottom: 10px;
+  padding: 10px;
+}
+#edit-triage-zip{
+  width:65px;
+}
+@media screen and (max-width: 759px) {
+  h1, h2, h3 {
+    font-size: 115%;
+  }
+  .page-triage input {
+    font-size: 120%;
+    max-width: 95%;
+  }
+}
+@media screen and (max-width: 639px) {
+  #nav-wrapper {
+    top: 5px;
+  }
+  .article-wrapper > h4,
+  .form-wrapper > h4,
+  .classroom-wrapper > h4,
+  .legal-help-wrapper > h4,
+  .video-wrapper > h4,
+  .map-wrapper > h4,
+  .problem-wrapper > h4 {
+    font-size: 24px;
+  }
+  .triage-action-item .node h2 a:link {
+    font-size: 18px;
+  }
+  .ds-2col-stacked .group-left,
+  .ds-2col-stacked .group-right{
+    float: left;
+    width: 100%;
+  }
+}
+@media screen and (min-width: 760px) {
+  .page-triage-actions-process #nav-wrapper {
+    top: 0;
+  }
+  .page-triage-actions-process #content-wrapper {
+    background: #fff none repeat scroll 0 0;
+    margin: 0 auto;
+  }
+  #triage-page-wrapper.alt-display {
+    margin-top: 65px;
+    padding: 20px 10px 10px;
+    z-index: 999;
+    width: 80%;
+    left: 10%;
+  }
+  .ta-main-panel {
+    float: left;
+    width: 65%;
+    font-size: 90%;
+  }
+  .ta-help-panel {
+    margin-top: -10px !important;
+    margin-right: -2%;
+    width: 34%;
+    font-size: 85%;
+  }
+  .triage-step-text {
+    display: block;
+  }
+}
+@media screen and (min-width: 960px) {
+  #triage-page-wrapper.alt-display {
+    margin-top: 65px;
+    padding: 20px 10px 10px;
+    z-index: 999;
+    width: 60%;
+    left: 20%;
+  }
+}

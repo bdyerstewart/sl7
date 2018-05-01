@@ -1,0 +1,30 @@
+<?php
+// $Id: myservices.module $
+
+   function myservices_menu() {
+       $items['myservices/user'] = array(
+         'title' => 'Get auth',
+         'page callback' => 'myservices_get_user',
+         'access arguments' => array('access content'),
+       );
+       return $items;
+   }
+
+   function myservices_get_user() {
+       global $user;
+	 $retval = "user" ;
+       if (in_array('authenticated user', $user->roles) ) 
+		{
+	           if (in_array('contributor', $user->roles) ) 
+				{$retval = $retval . 'contributor,';}
+	           if (in_array('editor', $user->roles) ) 
+				{$retval = $retval . 'editor,';}
+	           if (in_array('designer', $user->roles) ) 
+				{$retval = $retval . 'designer,';}
+      	 } 
+	 else 
+		{
+           		$retval = 'anonymous';
+       	}
+	print $retval ;
+   }

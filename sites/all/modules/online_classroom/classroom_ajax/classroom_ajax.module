@@ -1,0 +1,15 @@
+<?php
+
+/**
+ * @file
+ * Classroom AJAX.
+ */
+
+/**
+ * Implements hook_views_pre_render().
+ */
+function classroom_ajax_views_pre_render(&$view) {
+  if ($view->name == 'classroom_steps' && $view->current_display == 'panel_pane_3') {
+  drupal_add_js(drupal_get_path('module', 'classroom_ajax') . '/classroom_ajax.js', array('group' => JS_THEME));
+  }
+}

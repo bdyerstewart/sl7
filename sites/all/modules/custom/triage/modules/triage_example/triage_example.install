@@ -1,0 +1,28 @@
+<?php
+
+function triage_example_install(){
+    
+}
+function triage_example_uninstall(){
+    $voc = taxonomy_vocabulary_machine_name_load('me_triage');
+    if ($voc->vid){
+        taxonomy_vocabulary_delete($voc->vid);
+    }
+    $voc = taxonomy_vocabulary_machine_name_load('maine_triage_status_groups');
+    if ($voc->vid){
+        taxonomy_vocabulary_delete($voc->vid);
+    }
+    $voc = taxonomy_vocabulary_machine_name_load('triage_income_eligibility');
+    if ($voc->vid){
+        taxonomy_vocabulary_delete($voc->vid);
+    }
+    $nid = variable_get('triage_example_page_nid',0);
+    node_delete($nid);
+    db_query('delete from triage_actions where entity_id = :id',array(':id'=>$nid));
+    $id = '00c7aa59-a0d7-4885-a1a7-48de8d284188';
+    $tid = db_query('select tid from taxonomy_term_data where uuid = :id',array(':id'=>$id))->fetchColumn();
+    db_query('delete from triage_actions where entity_id = :id',array(':id'=>$tid));
+    variable_set('triage_example_page_nid', 0);
+    variable_set('triage_example_compile',false);
+    menu_rebuild();
+}

@@ -1,0 +1,14 @@
+name = Easy subscription
+description = Providing easy subscription system.
+package = Subscription
+core = 7.x
+
+
+
+
+; Information added by drupal.org packaging script on 2011-12-25
+version = "7.x-1.3"
+core = "7.x"
+project = "easy_subscription"
+datestamp = "1324851340"
+

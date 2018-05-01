@@ -1,0 +1,215 @@
+<?php
+
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'slideblocks') . '/slideblocks.admin.inc';
+function slideblocks_init(){
+    $blocks = array();
+    $results = db_query('select form_id, 
+                    title, 
+                    width, 
+                    tabcolor, 
+                    tabbackcolor,
+                    panelcolor, 
+                    panelbackcolor,
+                    use_colors,
+                    js_calls
+                    from slide_blocks where use_slide = 1 order by weight');
+    $i = 0;
+    foreach($results as $result){
+        $blocks[$i]['form_id'] = $result->form_id;
+        $blocks[$i]['tabcolor'] = $result->tabcolor;
+        $blocks[$i]['tabbackcolor'] = $result->tabbackcolor;
+        $blocks[$i]['panelcolor'] = $result->panelcolor;
+        $blocks[$i]['panelbackcolor'] = $result->panelbackcolor;
+        $blocks[$i]['use_colors'] = $result->use_colors;
+        $blocks[$i]['js_calls'] = $result->js_calls;
+        $blocks[$i]['width'] = $result->width;
+        $blocks[$i]['title'] = $result->title;
+        $i++;
+    }
+    $sideblocks = array(
+        'use_slideblocks' => variable_get('slideblocks_use_slideblock',TRUE),
+        'content_area' => variable_get('slideblocks_main_area',"body"),
+        'sidebar' => variable_get('slideblocks_sidebar',".sidebar"),
+        'blocks' => $blocks,
+        'trigger_width' => variable_get("slideblocks_trigger_width", 800),
+        'tabloc' => variable_get('slideblocks_location',"left"),
+        'top_margin' => variable_get('slideblocks_top_margin',40),
+        'content_dom' => variable_get('slideblocks_content_dom',""),
+        'content_margin' => variable_get('slideblocks_content_margin',45),
+        'sidebar_threshold' =>  variable_get('slideblocks_sidebar_threshold',800),
+        
+    );
+    drupal_add_js(array('slideblocks_data' => $sideblocks), 'setting');
+}
+function slideblocks_permission() {
+
+} 
+function slideblocks_menu(){
+  $items['admin/config/system/slideblocks'] = array(
+    'title' => 'Slideblocks Configuration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('slideblocks_admin_form'),
+    'access callback' => TRUE,
+  );
+  return $items;
+}
+function slideblocks_form_alter(&$form, &$form_state, $form_id) {
+    if ($form_id == 'block_admin_configure' || $form_id == "block_add_block_form"){
+        $id = "block-" . $form_state['build_info']['args'][0] . "-" . $form_state['build_info']['args'][1];
+        $id = str_replace( "_", "-", $id);
+        $form['slideblocks'] = array(
+            '#type' => 'fieldset',
+            '#title' => t('Slideblock settings'),
+            '#weight' => 0,
+            '#collapsible' => TRUE,
+            '#collapsed' => TRUE,
+        );
+         $form['slideblocks']['use_slideblock'] = array(
+            '#type' => 'checkbox',
+            '#name' => 'use_slideblock',
+            '#default_value' => slideblocks_getvals($id,'use_slide',0),
+            '#title' => t('Add to side pull outs when mobile'),
+         );
+         $form['slideblocks']['slideblock_title'] = array(
+            '#type' => 'textfield',
+            '#name' => 'slideblock_title',
+            '#default_value' => slideblocks_getvals($id,'title',''),
+            '#title' => t('Alternative Block Title when used in slide'),
+         );
+         $form['slideblocks']['slideblock_use_color'] = array(
+            '#type' => 'checkbox',
+            '#name' => 'slideblock_use_color',
+            '#default_value' => slideblocks_getvals($id,'use_colors',0),
+            '#title' => t('Use custom colors for slide out panel'),
+         );
+         $form['slideblocks']['slideblock_tabcolor'] = array(
+            '#type' => 'textfield',
+            '#name' => 'slideblock_tabcolor',
+            '#default_value' => slideblocks_getvals($id,'tabcolor',''),
+            '#title' => t('Custom color for text on side tab, HEX without #, e.g. FFFFFF'),
+            '#states' => array(
+                'visible' => array(
+                ':input[name="slideblock_use_color"]' => array("checked" => TRUE),
+              ),
+            ),
+         );
+         $form['slideblocks']['slideblock_tabbackcolor'] = array(
+            '#type' => 'textfield',
+            '#name' => 'slideblock_tabbackcolor',
+            '#default_value' => slideblocks_getvals($id,'tabbackcolor',''),
+            '#title' => t('Custom background color for side tab, HEX without #, e.g. FFFFFF'),
+            '#states' => array(
+                'visible' => array(
+                ':input[name="slideblock_use_color"]' => array("checked" => TRUE),
+              ),
+            ),
+         );
+         $form['slideblocks']['slideblock_panelcolor'] = array(
+            '#type' => 'textfield',
+            '#name' => 'slideblock_panelcolor',
+            '#default_value' => slideblocks_getvals($id,'panelcolor',''),
+            '#title' => t('Custom color for text on slide out panel, HEX without #, e.g. FFFFFF'),
+            '#states' => array(
+                'visible' => array(
+                ':input[name="slideblock_use_color"]' => array("checked" => TRUE),
+              ),
+            ),
+         );
+         $form['slideblocks']['slideblock_panelbackcolor'] = array(
+            '#type' => 'textfield',
+            '#name' => 'slideblock_panelbackcolor',
+            '#default_value' => slideblocks_getvals($id,'panelbackcolor',''),
+            '#title' => t('Custom background color for slide out panel, HEX without #, e.g. FFFFFF'),
+            '#states' => array(
+                'visible' => array(
+                ':input[name="slideblock_use_color"]' => array("checked" => TRUE),
+              ),
+            ),
+         );
+         $form['slideblocks']['slideblock_width'] = array(
+            '#type' => 'textfield',
+            '#name' => 'slideblock_width',
+            '#default_value' => slideblocks_getvals($id,'width',800),
+            '#title' => t('Width when slide is invoked'),
+         );
+         $form['slideblocks']['slideblock_weight'] = array(
+            '#type' => 'textfield',
+            '#name' => 'slideblock_weight',
+            '#default_value' => slideblocks_getvals($id,'weight',0),
+            '#title' => t('Weight'),
+            '#description' => 'Arrange blocks by lightest -10 to highest 10; heavier weights appear lower',
+         );
+         $form['slideblocks']['slideblock_js_calls'] = array(
+            '#type' => 'textarea',
+            '#name' => 'slideblock_js_calls',
+            '#default_value' => slideblocks_getvals($id,'js_calls',0),
+            '#title' => t('Javascript Calls'),
+            '#description' => 'Javascript functions that need to be called after content is moved '
+             . 'into the slideblock (jQuery click setups, etc).  Must be a function call, not written out code.',
+         );
+         
+         $form['#validate'][] = 'slideblocks_custom_validation';
+    }
+}
+function slideblocks_custom_validation(&$form, &$form_state) {
+    $id = "block-" . $form_state['values']['module'] . "-" . $form_state['values']['delta'];
+    $id = str_replace("_", "-", $id );
+    $val = $form_state['input']['use_slideblock'];
+    $tabcolor = $form_state['input']['slideblock_tabcolor'];
+    $tabbackcolor = $form_state['input']['slideblock_tabbackcolor'];
+    $panelcolor = $form_state['input']['slideblock_panelcolor'];
+    $panelbackcolor = $form_state['input']['slideblock_panelbackcolor'];
+    $title = $form_state['input']['slideblock_title'];
+    $width = $form_state['input']['slideblock_width'];
+    $weight = $form_state['input']['slideblock_weight'];
+    $use_color = $form_state['input']['slideblock_use_color'];
+    $js_calls = $form_state['input']['slideblock_js_calls'];
+    if (is_null($width)){$width = 0;}
+    if ($width<0){$width = 0;}
+    $sql = "select count(*) from slide_blocks where form_id = :id";
+    $found = db_query($sql, array(':id'=>$id))->fetchColumn();
+    //dsm($found);
+    if ($found){
+        db_update('slide_blocks') 
+            ->fields(array(
+                'use_slide' => $val,
+                'tabcolor' => $tabcolor,
+                'tabbackcolor' => $tabbackcolor,
+                'panelcolor' => $panelcolor,
+                'panelbackcolor' => $panelbackcolor,
+                'width' => $width,
+                'title' => $title,
+                'weight' => $weight,
+                'use_colors' => $use_color,
+                'js_calls' => $js_calls,
+                )
+            )
+        ->condition('form_id',$id)
+        ->execute();        
+    }
+    else{
+        db_insert('slide_blocks') // Table name no longer needs {}
+            ->fields(array(
+                'form_id' => $id,
+                'use_slide' => $val,
+                'tabcolor' => $tabcolor,
+                'tabbackcolor' => $tabbackcolor,
+                'panelcolor' => $panelcolor,
+                'panelbackcolor' => $panelbackcolor,
+                'width' => $width,
+                'title' => $title,
+                'weight' => $weight,
+                'use_colors' => $use_color,
+                'js_calls' => $js_calls,
+        ))
+        ->execute();
+    }
+}
+function slideblocks_getvals($id, $fld, $default=0){
+    $bds = '';
+    $val = db_query("select $fld from slide_blocks where form_id = :id", 
+                        array(':id' => $id)
+            )->fetchColumn();    
+    if(! $val){$val = $default;}
+    return $val;
+}

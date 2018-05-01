@@ -1,0 +1,229 @@
+a {
+  overflow-wrap: break-word;
+  -ms-hyphens: auto;
+  -webkit-hyphens: auto;
+  -moz-hyphens: auto;
+  hyphens: auto;
+}
+.collapse-text-fieldset .fieldset-legend {
+  font-size: 22px;
+  -webkit-background-size: 12px !important;
+  background-size: 12px !important;
+  padding-left: 30px !important;
+}
+.forum-post-panel-main {
+  min-height: 0;
+}
+td.og-group-list {
+  background-color: #efefef;
+  border: 1px solid #333;
+  padding-bottom: 15px;
+}
+.more-link {
+  background-color: #254681;
+  border: 1px solid #000;
+  border-radius: 8px;
+  margin: 10px;
+  padding: 4px 20px;
+  text-align: right;
+  float: right
+}
+.more-link a {
+  color: #fff;
+  text-decoration: none;
+}
+.more-link:hover {
+  background-color: #914b05;
+}
+.avail-groups {
+  background-color: #ddd;
+  display: inline-block;
+  float: left;
+  padding: 8px;
+  width: 100%;
+}
+.avail-groups.views-row-even {
+  background-color: #eee;
+}
+.advocate-network:hover {
+  background-color: #ccc;
+}
+.showslidetext ul {
+  margin: 0 10px;
+  list-style-type: none;
+}
+.showslidetext ul ul {
+  margin: 0 20px;
+}
+.pane-classroom-steps-panel-pane-1 {
+  background-color: #d6f5b1;
+  padding: 7px;
+}
+.page-classroom #featured-image {
+  display: none;
+}
+.fp_news p {
+  font-size: 12px;
+  font-weight: normal;
+  margin: 0 0 0 15px;
+}
+.org-edit a {
+  background-color: #3d629d;
+  border: 1px solid #000;
+  border-radius: 14px;
+  color: #fff;
+  padding: 7px;
+  margin-left: 10px;
+  text-decoration: none;
+  outline: none;
+}
+.org-edit a:visited,
+.org-edit a:active {
+  color: #fff;
+}
+.advocate-toolkit {
+  border: 1px solid #295297;
+  float: left;
+  margin: 10px 1% 10px 0;
+  padding: 5px 1%;
+  width: 96%;
+  min-height: 100px;
+}
+.advocate-toolkit-icon img {
+  float: left;
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+.advocate-toolkit-title {
+  font-size: 20px;
+}
+.advocate-toolkit-body {
+  color: #000;
+  font-size: 14px;
+}
+.advocate-toolkit:hover {
+  background-color: #dede;
+}
+.sign-me-up {
+  background-image: linear-gradient(to bottom, #ffee99 0%, #efbc39 100%);
+  padding: 5px 0 1px;
+}
+.sign-up {
+  background-color: #fff;
+  border: 1px solid #000;
+  border-radius: 5px;
+  padding: 5px 10px;
+  text-decoration: none;
+}
+.showslidetext{
+  text-shadow: 1px 1px #000;
+}
+.stateside-copy {
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  display: inline-block;
+  font-size: 14px;
+  font-weight: bold;
+  height: 58px;
+  margin-left: 10px;
+  padding: 22px 0 0;
+  position: relative;
+  text-align: center;
+  top: -26px;
+  width: 85px;
+}
+.stateside-copy:hover{
+  background-color: #bbd3f7;
+}
+#copy-confirm{
+  color: #0d841d;
+}
+#block-block-49 {
+  border: 1px solid #ccc;
+  padding: 10px 0 0;
+  margin-top: 10px;
+}
+.addthis_toolbox{
+  float: left;
+}
+.language-switcher-locale-url {
+  margin-top: 7px;
+}
+.page-triage #breadcrumb,
+  .page-classroom #breadcrumb{
+  display: inline-block;
+}
+.sl-language{
+  border: 1px solid #777;
+  padding: 5px 10px;
+  background-color: #DFDFDF;
+  max-width: 350px;
+  float: right;
+  margin-bottom: 7px;
+}
+.page-triage-actions-process .sl-language{
+  float: none;
+}
+.sl-language .title{
+  font-weight: bold;
+  padding-right: 10px;
+}
+.sl-language ul{
+  list-style: none;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+  display: inline-block;
+}
+.sl-language li{
+  display: inline-block;
+}
+
+.sl-language li a {
+  padding: 4px 10px;
+  border: 1px solid #DFDFDF;
+}
+.sl-language li a:hover {
+  background-color: rgba(238, 216, 33, 0.5);
+  border: 1px solid #ccc;
+}
+.page-classroom fieldset.collapsed{
+  height: auto !important;
+}
+.page-classroom fieldset legend {
+  height: auto;
+  position: relative;
+  line-height: 1.2;
+  text-indent: 0 !important;
+}
+#searchbar-wrapper{
+  min-height: 70px;
+  height: auto;
+
+}
+#webform-client-form-787573 .form-item,
+  #webform-client-form-787573 .form-item input {
+  width: 95%;
+}
+#webform-client-form-787573 .form-item input#edit-captcha-response{
+  width: auto;
+}
+#main-content{
+  background-color: #fff;
+}
+@media screen and (min-width: 600px) {
+  .avail-groups {
+    width: 47%;
+    margin-right: 1%;
+  }
+}
+@media screen and (min-width: 768px) {
+  .avail-groups {
+    width: 30%;
+    margin-right: 1%;
+  }
+  .advocate-toolkit {
+    width: 46%;
+  }
+}

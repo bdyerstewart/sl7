@@ -1,0 +1,16 @@
+name = Job Posting
+core = 7.x
+package = Features
+php = 5.2.4
+dependencies[] = date
+dependencies[] = features
+dependencies[] = field_group
+features[features_api][] = api:1
+features[field][] = node-job_posting-body
+features[field][] = node-job_posting-field_email
+features[field][] = node-job_posting-field_position_dates
+features[field][] = node-job_posting-field_publish_dates
+features[field][] = node-job_posting-field_requirements
+features[field][] = node-job_posting-field_url
+features[field][] = node-job_posting-field_when
+features[node][] = job_posting

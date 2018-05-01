@@ -1,0 +1,2632 @@
+<?php
+//require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage') . '/triage.blocks.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage') . '/triage.forms.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage') . '/triage.admin.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage') . '/triage.pages.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage') . '/triage.orgsearch.inc';
+require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'triage') . '/triage.org.filter.inc';
+global $ta_conf;
+function triage_init($reset = FALSE) {
+  triage_set_variables();
+  if (!drupal_session_started()) {
+    drupal_session_start();
+  }
+  global $base_url;
+  drupal_add_css(drupal_get_path('module', 'triage') . '/fonts/font-awesome.min.css', 'file');
+  //  drupal_add_js(drupal_get_path('module', 'triage') . '/js/jquery.easypiechart.min.js');
+  if (stristr(current_path(), "triage/") !== FALSE
+    && strpos(current_path(), "admin") === FALSE
+  ) {
+    drupal_add_js('jQuery(document).ready(function () { 
+                jQuery(window).bind("beforeunload", function(){
+                    var triage_path = window.location.protocol + "//" + window.location.host;
+                    var url = triage_path + Drupal.settings.basePath + "triage_write_history";
+                    console.log("call write");                  
+                    jQuery.ajax({
+                          async: false,
+                          cache: false,
+                          url: url,
+                    });
+                });
+                jQuery("input[type=submit]").click(function(e){
+                    jQuery(window).unbind("beforeunload");
+                });
+                //triage_progress(-1);
+             });', 'inline');
+  }
+  $thisvoc = db_query('select distinct vid from triage_log where vid > 0')->fetchColumn();
+  if (!isset($_SESSION['triage-dv'])) {
+    $_SESSION['triage-dv'] = 0;
+  }
+  if (!isset($_SESSION['triage'])) {
+
+    $_SESSION['triage'] = array();
+    $_SESSION['triage']['delete_group'] = 0;
+    $_SESSION['triage']['edit_tid'] = NULL;
+    $_SESSION['triage']['end_nodes'] = array();
+    $_SESSION['triage']['factors'] = array();
+    $_SESSION['triage']['followup'] = array();
+    $_SESSION['triage']['location_success'] = FALSE;
+    $_SESSION['triage']['my_benefits'] = array();
+    $_SESSION['triage']['my_bundle'] = 'taxonomy';
+    $_SESSION['triage']['my_county'] = "";
+    $_SESSION['triage']['my_house_income'] = NULL;
+    $_SESSION['triage']['my_house_size'] = NULL;
+    $_SESSION['triage']['my_lat'] = 0;
+    $_SESSION['triage']['my_long'] = "";
+    $_SESSION['triage']['my_path'] = array();
+    $_SESSION['triage']['my_senior'] = 0;
+    $_SESSION['triage']['my_state'] = '';
+    $_SESSION['triage']['my_tid'] = NULL;
+    $_SESSION['triage']['my_town'] = "";
+    $_SESSION['triage']['my_zip'] = "";
+    $_SESSION['triage']['org_filter']['nid'] = NULL;
+    $_SESSION['triage']['org_filter']['bundle'] = 'node';
+    $_SESSION['triage']['time_end'] = 0;
+    $_SESSION['triage']['time_start'] = 0;
+    $_SESSION['triage']['triage_actions_admin_parent'] = '0';
+    $_SESSION['triage']['triage_actions_admin_voc'] = variable_get('triage_actions_admin_voc', NULL);
+    $_SESSION['triage']['triage_actions_form_count'] = 0;
+    $_SESSION['triage']['triage_bank_amt'] = NULL;
+    $_SESSION['triage']['triage_bypass'] = 0;
+    $_SESSION['triage']['triage_change_info'] = 0;
+    $_SESSION['triage']['triage_current_voc'] = '';
+    $_SESSION['triage']['triage_direct_nid'] = 0;
+    $_SESSION['triage']['triage_done_that'] = FALSE;
+    $_SESSION['triage']['triage_eligibility'] = array();
+    $_SESSION['triage']['triage_email'] = 0;
+    $_SESSION['triage']['triage_final_tid'] = NULL;
+    $_SESSION['triage']['triage_geo_state'] = "ME";
+    $_SESSION['triage']['triage_group_id'] = 0;
+    $_SESSION['triage']['triage_hide_popup'] = 0;
+    $_SESSION['triage']['triage_history'] = '';
+    $_SESSION['triage']['triage_in_questions'] = NULL;
+    $_SESSION['triage']['triage_in_service_area'] = NULL;
+    $_SESSION['triage']['triage_income_period'] = '';
+    $_SESSION['triage']['triage_info'] = '';
+    $_SESSION['triage']['triage_intake_elig'] = 0;
+    $_SESSION['triage']['triage_intro_text'] = t("You said") . ': ';
+    $_SESSION['triage']['triage_kind_of_help'] = '';
+    $_SESSION['triage']['triage_last_stop'] = '';
+    $_SESSION['triage']['triage_live_alone'] = '0';
+    $_SESSION['triage']['triage_make_suggestion'] = TRUE;
+    $_SESSION['triage']['triage_no_you_said'] = FALSE;
+    $_SESSION['triage']['triage_non_service_area'] = NULL;
+    $_SESSION['triage']['triage_one_state_text'] = '';
+    $_SESSION['triage']['triage_page_nid'] = 0;
+    $_SESSION['triage']['triage_percent_pov'] = 0;
+    $_SESSION['triage']['triage_popup_counter'] = 0;
+    $_SESSION['triage']['triage_preview'] = FALSE;
+    $_SESSION['triage']['triage_print_it'] = FALSE;
+    $_SESSION['triage']['triage_return_to'] = 0;
+    $_SESSION['triage']['triage_reusable_filter'] = "";
+    $_SESSION['triage']['triage_reusable_text_only'] = 0;
+    $_SESSION['triage']['triage_sa_extra'] = '';
+    $_SESSION['triage']['triage_send_to'] = '';
+    $_SESSION['triage']['triage_show_submit'] = 0;
+    $_SESSION['triage']['triage_ssid'] = 0;
+    $_SESSION['triage']['triage_state_id'] = 'ME';
+    $_SESSION['triage']['triage_status'] = array();
+    $_SESSION['triage']['triage_suggestions_report'] = array();
+    $_SESSION['triage']['triage_summary_report'] = array();
+    $_SESSION['triage']['triage_summary_voc'] = $thisvoc;
+    $_SESSION['triage']['triage_total_steps'] = 0;
+    $_SESSION['triage']['triage_who_is'] = NULL;
+  }
+
+  if (module_exists('flags')) {
+    $flags = flag_get_user_flags('node');
+    if (isset($flags['county'])) {
+      $county = array_shift($flags['county']);
+      $county_nid = $county->entity_id;
+      $node = node_load($county_nid);
+      $_SESSION['triage']['my_county'] = $node->title;
+      $_SESSION['triage']['triage_in_service_area'] = '1';
+    }
+  }
+}
+
+function triage_permission() {
+  return array(
+    'administer triage page' => array(
+      'title' => t('Administer Triage Page Entities'),
+    ),
+    'view triage page' => array(
+      'title' => t('View Triage Page Entities'),
+    ),
+    'view user input' => array(
+      'title' => t('View User Input'),
+    ),
+    'administer display groupings' => array(
+      'title' => t('Administer Display Groupings'),
+    ),
+  );
+}
+
+function triage_menu() {
+  $items = array();
+  $items['triage/%'] = array(
+    'title' => 'Triage',
+    'description' => 'Triage',
+    'page callback' => 'triage_main',
+    'page arguments' => array(1),
+    'access arguments' => array('view triage page'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_write_history'] = array(
+    'title' => 'Triage History Recording',
+    'access callback' => TRUE,
+    'page callback' => 'triage_write_history',
+    'type' => MENU_CALLBACK,
+  );
+  $items['triageloc/%'] = array(
+    'title' => 'Triage Page Info',
+    'page callback' => 'triage_place',
+    'page arguments' => array(1),
+    'access arguments' => TRUE,
+  );
+  $items['admin/config/system/triage'] = array(
+    'title' => 'Overall Triage Configuration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_admin_form'),
+    'access arguments' => array('administer triage page'),
+  );
+  $items['admin/reports/triage/triage_summary'] = array(
+    'title' => 'Triage Summary Report',
+    'page callback' => 'triage_summary',
+    'access arguments' => array('administer triage page'),
+  );
+  $items['triage-no-thanks'] = array(
+    'title' => 'Triage Configuration',
+    'page callback' => 'triage_no_thanks',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_summary_excel'] = array(
+    'title' => 'Triage Data to Excel',
+    'access callback' => TRUE,
+    'page callback' => 'triage_summary_excel',
+    'page arguments' => array(TRUE),
+  );
+  $items['triage-post'] = array(
+    'title' => 'Triage Post',
+    'page callback' => 'triage_post',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  $items['triage_change_it/%'] = array(
+    'title' => 'Triage Change Info',
+    'page callback' => 'triage_change_it',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/reports/triage/triage_suggestions'] = array(
+    'title' => 'Triage Client Input Report',
+    'page callback' => 'triage_suggestions',
+    'access arguments' => array('administer triage page'),
+  );
+  $items['triage_org_filter_delete/%'] = array(
+    'title' => 'Delete Org Filter',
+    'access arguments' => array('administer triage page'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('triage_org_filter_delete_confirm', 1),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function triage_form_alter(&$form, &$form_state, $form_id) {
+  $bds = '';
+  if ($form_id == 'triage_org_filter_form') {
+    unset($form['triage_org_visibility']['triage_legal_problem_set']['tree']['#element_validate']);
+    $form['triage_org_visibility']['triage_legal_problem_set']['tree']['#element_validate'] = array('_triage_org_tree_widget_validate');
+    unset($form['triage_org_visibility']['triage_actions_county_set']['county_info']['#element_validate']);
+    $form['triage_org_visibility']['triage_actions_county_set']['county_info']['#element_validate'] = array('_triage_org_county_validate');
+    //$form['triage_org_visibility']['triage_actions_county_set']
+  }
+}
+
+function triage_write_history() {
+  //watchdog('bds',serialize($_SESSION['triage']));
+  $start = $_SESSION['triage']['time_start'];
+  $end = $_SESSION['triage']['time_end'];
+  if ($start === 0) {
+    $start = time();
+  }
+  if ($end === 0) {
+    $end = time();
+  }
+  $ssid = session_id();
+  $pov = triage_percent_pov();
+  $score = triage_get_aggregate();
+  $intake_elig = $_SESSION['triage']['triage_intake_elig'];
+  $author = $_SESSION['triage']['triage_who_is'];
+  if (!isset($_COOKIE['triage_hist'])) {
+    setcookie('triage_hist', '', time() + (86400 * 30), "/");
+    $_COOKIE['triage_hist'] = '';
+  }
+  if (!isset($_COOKIE['triage_last'])) {
+    setcookie('triage_last', '', time() + (86400 * 30), "/");
+    $_COOKIE['triage_last'] = '';
+  }
+  if (!isset($_COOKIE['triage_last_tid'])) {
+    setcookie('triage_last_tid', '', time() + (86400 * 30), "/");
+    $_COOKIE['triage_last_tid'] = '';
+  }
+  if (!isset($_COOKIE['triage_completed'])) {
+    setcookie('triage_completed', 0, time() + (86400 * 30), "/");
+    $_COOKIE['triage_completed'] = 0;
+  }
+
+  if ($_SESSION['triage']['triage_in_questions'] == 0) {
+    //$_SESSION['triage']['triage_history'] .= $_COOKIE['triage_hist'];
+    //$_SESSION['triage']['triage_last_stop'] = $_COOKIE['triage_last'];
+  }
+  $hs = intval($_SESSION['triage']['my_house_size']);
+  if (is_null($hs) || !isset($hs)) {
+    $hs = 0;
+  }
+  if (!is_int($hs)) {
+    $hs = 0;
+  }
+  $inc = intval($_SESSION['triage']['my_house_income']);
+  if (is_null($inc)) {
+    $inc = 0;
+  }
+  if (!is_int($inc)) {
+    $inc = 0;
+  }
+  $bnk = intval($_SESSION['triage']['triage_bank_amt']);
+  if (is_null($bnk)) {
+    $bnk = 0;
+  }
+  $email = $_SESSION['triage']['triage_email'];
+  if ($email) {
+    $_SESSION['triage']['triage_email'] = 0;
+  }
+  $county = $_SESSION['triage']['my_county'];
+  if (is_null($county)) {
+    $county = '';
+  }
+  $ts = "";
+  $bentext = '';
+  $factext = '';
+  if (triage_is_form_used('triage_status_form')) {
+    $vals = $_SESSION['triage']['triage_status'];
+    $ts = triage_tax_list($vals);
+  }
+  if (triage_is_form_used('triage_income_form')) {
+    $vals = $_SESSION['triage']['my_benefits'];
+    $bentext = triage_tax_list($vals);
+  }
+  if (triage_is_form_used('triage_followup_form')) {
+    $vals = $_SESSION['triage']['factors'];
+    $factext = triage_tax_list($vals);
+  }
+  $tid = 0;
+  $other_cat = '';
+  if (is_numeric($_COOKIE['triage_last_tid'])) {
+    $tid = $_COOKIE['triage_last_tid'];
+    $other_cat = db_query('select field_triage_extra_value from field_data_field_triage_extra where entity_id = :tid', array(':tid' => $tid))->fetchColumn();
+  }
+  if (!$other_cat) {
+    $other_cat = '';
+  }
+  //  if(! isset($_COOKIE['triage_current_step'])){
+  //      //$_COOKIE['triage_current_step'] = 0;
+  //  }
+  $help = '';
+  if ($_SESSION['triage']['triage_kind_of_help']) {
+    $help = taxonomy_term_load($_SESSION['triage']['triage_kind_of_help'])->name;
+  }
+  $steps = $_COOKIE['triage_current_step'];
+  $thisvid = $_SESSION['triage']['triage_current_voc'];
+  if ($thisvid == '') {
+    $thisvid = 0;
+  }
+  $logid = db_query('select id from triage_log where ssid=:ssid', array(':ssid' => $ssid))->fetchColumn();
+  if ($logid > 0) {
+    $curr = db_query('select * from triage_log where ssid=:ssid', array(':ssid' => $ssid))->fetchAssoc();
+    db_update('triage_log')
+      ->fields(array(
+        'ip' => ip_address(),
+        'vid' => $thisvid,
+        'history' => $_SESSION['triage']['triage_history'],
+        'time' => $start,
+        'time_end' => $end,
+        'steps' => max($curr['steps'], $steps),
+        'last_stop' => $_SESSION['triage']['triage_last_stop'],
+        'completed' => max($curr['completed'], $_COOKIE['triage_completed']),
+        'non_service_area' => $_SESSION['triage']['triage_non_service_area'],
+        'zipcode' => $_SESSION['triage']['my_zip'],
+        'county' => $county,
+        'household' => $hs,
+        'status' => $ts,
+        'income' => $inc,
+        'pov' => $pov,
+        'bank' => $bnk,
+        'tid' => $tid,
+        'other_cat' => $other_cat,
+        'intake_elig' => $intake_elig,
+        'email' => $email,
+        'help' => $help,
+        'benefits' => $bentext,
+        'factors' => $factext,
+        'aggregate' => $score,
+        'author' => $author,
+      ))
+      ->condition('ssid', $ssid)
+      ->execute();
+  }
+  else {
+    db_insert('triage_log')
+      ->fields(array(
+        'ip' => ip_address(),
+        'vid' => $thisvid,
+        'history' => $_SESSION['triage']['triage_history'],
+        'time' => $start,
+        'time_end' => $end,
+        'steps' => $steps,
+        'last_stop' => $_SESSION['triage']['triage_last_stop'],
+        'completed' => $_COOKIE['triage_completed'],
+        'non_service_area' => $_SESSION['triage']['triage_non_service_area'],
+        'zipcode' => $_SESSION['triage']['my_zip'],
+        'county' => $_SESSION['triage']['my_county'],
+        'household' => $hs,
+        'status' => $ts,
+        'income' => $inc,
+        'pov' => $pov,
+        'bank' => $bnk,
+        'tid' => $tid,
+        'ssid' => $ssid,
+        'other_cat' => $other_cat,
+        'intake_elig' => $intake_elig,
+        'email' => $email,
+        'help' => $help,
+        'benefits' => $bentext,
+        'factors' => $factext,
+        'aggregate' => $score,
+        'author' => $author,
+      ))
+      ->execute();
+  }
+  triage_clear_log();
+  return;
+}
+
+function triage_clear_log($all = FALSE) {
+  $_SESSION['triage']['triage_total_steps'] = 0;
+  $_SESSION['triage']['triage_direct_nid'] = 0;
+  $_SESSION['triage']['triage_email'] = 0;
+  $_SESSION['triage']['triage_last_stop'] = '';
+  //$_SESSION['triage']['triage_change_info'] = 0;
+  $_SESSION['triage']['triage_in_questions'] = NULL;
+  setcookie('triage_current_step', 0, time() + (86400 * 30), "/");
+  setcookie('triage_completed', 0, time() + (86400 * 30), "/");
+  setcookie('triage_last', 0, time() + (86400 * 30), "/");
+  $_SESSION['triage']['time_start'] = 0;
+  $_SESSION['triage']['time_end'] = 0;
+}
+
+function triage_element_info_alter(&$type) {
+  if (isset($type['date_popup'])) {
+    $type['date_popup']['#process'][] = 'triage_date_popup_process';
+  }
+}
+
+function triage_date_popup_process($element, $form_state, $complete_form) {
+  unset($element['date']['#description']);
+  unset($element['date']['#title']);
+  return $element;
+}
+
+function triage_page_alter(&$page) {
+  $curr = current_path();
+  $front = variable_get('site_frontpage', 'node');
+  if ($curr == $front) {
+    unset($_SESSION['triage']);
+    triage_actions_init();
+  }
+  global $language;
+  global $user;
+  global $base_url;
+  drupal_add_js($base_url . '/misc/jquery.cookie.js');
+  $lang = $language->language;
+  $nid = -1;
+  $node_array = NULL;
+  if (isset($page['content']['system_main'])) {
+    if (isset($page['content']['system_main']['nodes'])) {
+      $node_array = array_keys($page['content']['system_main']['nodes']);
+    }
+  }
+  if ($node_array) {
+    $nid = $node_array[0];
+  }
+  $parent = -1;
+  $msg = triage_popup($nid, $parent);
+  $triage_popup_speed = variable_get('triage_popup_speed', "5000");
+  $triage_popup = array(
+    'msg' => $msg,
+    'min_width' => variable_get('triage_pop_min_width', "0"),
+    'max_width' => variable_get('triage_pop_max_width', "0"),
+    'speed' => $triage_popup_speed,
+    'parent' => $parent,
+    'hide_popup' => $_SESSION['triage']['triage_hide_popup'],
+    'url' => triage_url($nid),
+    'termname' => triage_url($nid, 'name'),
+  );
+  drupal_add_js(array('triage_popup' => $triage_popup), 'setting');
+  $thisnid = $_SESSION['triage']['triage_page_nid'];
+  drupal_add_js(array('triage_last_help_text' => ta_variable_get('triage_menu_text', 'Last Help', $thisnid)), 'setting');
+  if (triage_check_current_path()) {
+    $sections = explode(',', variable_get('triage_hide_page_sections', 'sidebar_first,sidebar_second,postscript_first,postscript_second,postscript_third'));
+    foreach ($sections as $section) {
+      unset($page[$section]);
+    }
+    if (strpos(current_path(), 'triage/') !== FALSE) {
+      $thisnid = $_SESSION['triage']['triage_page_nid'];
+      $base_node = node_load($thisnid);
+      $translations = translation_node_get_translations($base_node->nid);
+      $tp_node = (isset($translations[$lang]) ? node_load($translations[$lang]->nid) : $base_node);
+      $tp_title = t(ta_variable_get('triage_page_title', 'Find Legal Help', $thisnid));
+      drupal_set_title($tp_title);
+      $newdiv = trim(ta_variable_get('triage_progress_home_div', "", $thisnid));
+      if (ta_variable_get('triage_progress_type', 'bar', $thisnid) == 'bar'
+        && $newdiv != ""
+      ) {
+        drupal_add_js(array('newdiv' => $newdiv), 'setting');
+        drupal_add_js('jQuery(document).ready(function () {
+          var content = jQuery(".triage-progress-container").html();
+          var newdiv = "hey";
+          content = "<div class=\"triage-progress-container\">" + content + "</div>"
+          jQuery(".triage-progress-container").remove();
+          newdiv = Drupal.settings.newdiv;
+          jQuery(newdiv).html(content).css("background-image","none");
+          var rowheight = 0;
+          jQuery("div.triage-step").each(function(){
+            rowheight = Math.max(rowheight, jQuery(this).height());
+          });
+          jQuery(".triage-progress-container div.triage-step").height(rowheight);       
+        });', 'inline');
+      }
+    }
+    // To address title links for embedded nodes with triage display (triage-remove-a)
+    if (strpos(current_path(), 'triage_actions_process/') !== FALSE) {
+      //drupal_add_js(drupal_get_path('module', 'triage') . '/js/triage.js');
+      $thisnid = $_SESSION['triage']['triage_page_nid'];
+      drupal_add_js('jQuery(document).ready(function () {
+        jQuery(".triage-remove-a .node-title").each(function(){
+           title = jQuery(this).children("a").html();
+           jQuery(this).children("a").remove();
+           jQuery(this).html(title);
+        });
+      });', 'inline');
+      if (ta_variable_get('triage_use_progress_bar', FALSE, $thisnid) && ta_variable_get('triage_progress_extra_step', FALSE, $thisnid)) {
+        $newdiv = trim(ta_variable_get('triage_progress_home_div', "", $thisnid));
+        if (ta_variable_get('triage_progress_type', 'bar', $thisnid) == 'bar'
+          && $newdiv != ""
+        ) {
+          drupal_add_js(array('newdiv' => $newdiv), 'setting');
+          drupal_add_js('jQuery(document).ready(function () {
+            var content = jQuery(".triage-progress-container").html();
+            var newdiv = "hey";
+            content = "<div class=\"triage-progress-container\">" + content + "</div>"
+            jQuery(".triage-progress-container").remove();
+            newdiv = Drupal.settings.newdiv;
+            jQuery(newdiv).html(content).css("background-image","none");
+            var rowheight = 0;
+            jQuery("div.triage-step").each(function(){
+              rowheight = Math.max(rowheight, jQuery(this).height());
+            });
+            jQuery(".triage-progress-container div.triage-step").height(rowheight);   
+          });', 'inline');
+        }
+        drupal_add_js('jQuery(document).ready(function () {
+            triage_progress(-2);
+          });', 'inline');
+      }
+    }
+  }
+}
+
+function triage_check_current_path() {
+  $val = FALSE;
+  $pages = array();
+  $pages[] = 'triage/';
+  $pages[] = 'triage_actions_process/';
+  $pages[] = 'triage_actions_admin';
+  $pages[] = 'taxonomy/actions';
+  $pages[] = 'triage_actions_custom_editor';
+  $pages[] = 'triage_actions_reuse_editor';
+  foreach ($pages as $page) {
+    if (strpos(current_path(), $page) !== FALSE) {
+      $val = TRUE;
+      break;
+    }
+  }
+  if ((strpos(current_path(), 'taxonomy/term') !== FALSE) &&
+    (strpos(current_path(), '/actions') !== FALSE)
+  ) {
+    $val = TRUE;
+  }
+  return $val;
+}
+
+function triage_cron() {
+  $url = "http://statesidelegal.org/documents/currentGuidelines.js";
+  $session = curl_init($url);
+  curl_setopt($session, CURLOPT_RETURNTRANSFER, TRUE);
+  $data = curl_exec($session);
+  if ($data) {
+    $len = strpos($data, "var cyear");
+    $vals = explode("-", str_replace('var cguide = "', '', substr($data, 0, $len)));
+    for ($x = 9; $x <= 20; $x++) {
+      $vals[$x] = $vals[$x - 1] + $vals[0];
+    }
+    variable_set_value("triage_pov_guides", $vals);
+  }
+  curl_close($session);
+}
+
+/* * For the various triage pages, we need to create url redirects since they all use
+ * the triage/%/% url where the first parameter is the vocabulary to use and the
+ * second parameter is the tid being sought        
+ */
+function triage_url_inbound_alter(&$path, $original_path, $language) {
+  // Build the triage page requests
+  if (field_info_field('field_triage_path')
+    && field_info_field('field_triage_tree')) {
+    $p = explode("/", $path);
+    $last = array_pop($p);
+    $sql = "select tv.machine_name, 
+                np.field_triage_path_value as path,
+                nt.field_triage_tree_value as vid
+              from node n
+              inner join field_data_field_triage_path np on np.entity_id = n.nid
+              left join field_data_field_triage_tree nt on nt.entity_id = n.nid
+              inner join taxonomy_vocabulary tv on tv.vid = nt.field_triage_tree_value
+              where n.type = 'triage_page'";
+    $tpages = db_query($sql);
+    foreach ($tpages as $tpage) {
+      if ($last == $tpage->path) {
+        $path = 'triage/' . $tpage->machine_name;
+      }
+    }
+  }
+}
+
+function triage_admin_paths() {
+  $paths = array(
+    'node/*/triage_config*' => TRUE,
+    'node/*/triage_build*' => TRUE,
+    '*/triage_org_filter' => TRUE,
+    'triage_org_filter/%/edit' => TRUE,
+    'resources-by-nsmi' => TRUE,
+  );
+  return $paths;
+}
+
+/** triage_node_update
+ *
+ * @param type $node
+ * When a Triage Page is updated, the taxonomy vocabulary is checked
+ * to make sure that all auxilliary fields (icon, cross-question reference,
+ *   filter questions) are in place.
+ */
+function triage_node_update($node) {
+  if ($node->type == "triage_page") {
+    $loaded_node = node_load($node->nid, NULL, TRUE);
+    $vid = ta_variable_get('triage_vocabulary', '', $node->nid);
+    if ($vid) {
+      triage_add_fields($vid);
+      triage_add_fields3($vid);
+    }
+    triage_add_fields2($node->nid);
+  }
+}
+
+/** triage_main
+ *  Output function that builds questions from taxonomy for user selection
+ *  The initial call produces a library-type display of the parent categories
+ *  including icons and descriptions
+ *
+ *  Subsequent calls return jSON arrays to javascript function
+ *
+ * @param type $voc_name - the taxsonomy vocabulary name
+ * @param type $thistid - the tid whose children are being requested
+ * @param type $return_js - whether to return JSON or full page html
+ */
+function triage_main($voc_name = 'mass_logic_tree', $thistid = NULL, $return_js = 0, $groupid = 0) {
+  if (isset($_GET['clear'])) {
+    if ($_GET['clear'] == TRUE) {
+      unset($_SESSION['triage']);
+      triage_actions_init();
+    }
+  }
+  // SET UP CODE
+  if (TRUE) {
+    // Get set up with needed variables and see where we are
+    if ($_SESSION['triage']['time_start'] === 0) {
+      $_SESSION['triage']['time_start'] = time();
+      $_SESSION['triage']['my_path'] = array();
+    }
+    //watchdog('bds_start',$_SESSION['triage']['time_start']);
+    $povguides = variable_get_value("triage_pov_guides", array());
+    drupal_add_js(array('povguides' => $povguides), 'setting');
+    global $base_url;
+    //watchdog('rpt_a',serialize($_SESSION));
+    $bypass = FALSE;
+    $progress_end = FALSE;
+    $done_that = $_SESSION['triage']['triage_done_that'];
+    $go_on = 0;
+    if ($_SESSION['triage']['triage_direct_nid'] > 0) {
+      drupal_add_js(array('direct_nid' => $_SESSION['triage']['triage_direct_nid']), 'setting');
+    }
+    $_SESSION['triage']['triage_final_tid'] = NULL;
+    if ($_SESSION['triage']['my_county'] == '') {
+      if (module_exists('flags')) {
+        $flags = flag_get_user_flags('node');
+        if (isset($flags['county'])) {
+          $county = array_shift($flags['county']);
+          $county_nid = $county->entity_id;
+          $cntynode = node_load($county_nid);
+          $_SESSION['triage']['my_county'] = $cntynode->title;
+          $_SESSION['triage']['triage_in_service_area'] = '1';
+        }
+      }
+    }
+    //Get the status table name for this triage page so that we can filter the list we're creating
+    $voc = taxonomy_vocabulary_machine_name_load($voc_name);
+    $vid = $voc->vid;
+    $_SESSION['triage']['triage_current_voc'] = $vid;
+    $tp_node = triage_get_page($vid);
+    $nid = $tp_node->nid;
+    $totalsteps = triage_num_steps($nid);
+    $sql = "select extra 
+            from triage_actions 
+            where action_text = 'triage_in_service_area_form'  
+            and bundle = 'node'
+            and entity_id = :nid";
+    $sa_url = db_query($sql, array(":nid" => $nid))->fetchCol();
+    if ($sa_url) {
+      $_SESSION['triage']['triage_sa_extra'] = $sa_url;
+    }
+    $_SESSION['triage']['triage_page_nid'] = $nid;
+    $_SESSION['triage']['triage_in_questions'] = 0;
+    $pov = triage_percent_pov();
+    $triage_nav_type = ta_variable_get('triage_nav_type', 'bottom', $nid);
+    $resetcss = ta_variable_get('triage_reset_css', array(), $nid);
+    $submitcss = ta_variable_get('triage_submit_css', array(), $nid);
+    $use_css_builder = ta_variable_get('triage_use_css_builder', FALSE, $nid);
+    $css_file = ta_variable_get('triage_custom_css', '', $nid);
+    if ($css_file > '') {
+      $css_file = path_to_theme() . $css_file;
+      drupal_add_css($css_file, array('group' => CSS_THEME, 'type' => 'file'));
+    }
+    if (!ta_variable_get('triage_use_css_builder', FALSE, $nid)) {
+      unset($resetcss);
+      unset($submitcss);
+      $resetcss = array();
+      $submitcss = array();
+    }
+    $backtext = t(ta_variable_get('triage_reset_text', 'Back', $nid));
+    $out_of_state_url = ta_variable_get('triage_not_in_state', '', $nid);
+    $output = '';
+    $addtid = NULL;
+    $status = array(0);
+    if (!$return_js) {
+      $_SESSION['triage']['triage_group_id'] = 0;
+    }
+    global $language;
+    $lang = $language->language;
+    $default_lang = language_default('language');
+    // Check, if this is a direct referral, for the completion of required demographic data
+    // If missing, present in popup
+    if (!is_null($thistid)) {
+      $thistid = intval($thistid);
+    }
+    if ($thistid > 0 && !$return_js) {
+      $progress_end = TRUE;
+      $_SESSION['triage']['triage_done_that'] = FALSE;
+      drupal_add_js(array('direct_nid' => $thistid), 'setting');
+      $go_on = triage_get_details();
+      if ($go_on || $_SESSION['triage']['triage_change_info']) {
+        $_SESSION['triage']['triage_done_that'] = TRUE;
+        $_SESSION['triage']['triage_direct_nid'] = $thistid;
+        $rtrn_url = $base_url . "/triage/" . $voc_name;
+        drupal_goto($rtrn_url);
+      }
+    }
+    $my_triage = array(
+      'item' => array(),
+      'tid' => array('0' => 0),
+      'cat_text' => '',
+      'sub_text' => t($tp_sub_text),
+      'lang' => $lang,
+      'default_lang' => $default_lang,
+      'oos_url' => $out_of_state_url,
+      'default_state' => $_SESSION['triage']['triage_state_id'],
+      'triage_nav_type' => $triage_nav_type,
+      'triage_nav_bar_color' => ta_variable_get('triage_nav_bar_color', 'inherit', $nid),
+      'resetcss' => $resetcss,
+      'submitcss' => $submitcss,
+      'vocab' => t($voc_name),
+      'scroll_offset' => ta_variable_get('triage_scroll_offset', 0, $nid),
+    );
+    drupal_add_js(array('my_triage' => $my_triage), 'setting');
+    $my_alt_display = array(
+      'use_alt' => ta_variable_get('triage_use_alt_display', FALSE, $nid),
+      'alt_cmds' => ta_variable_get('triage_use_alt_commands', '', $nid),
+      'home_block' => ta_variable_get('triage_content_block', '', $nid),
+    );
+    drupal_add_js(array('my_alt_display' => $my_alt_display), 'setting');
+    // Get status info
+    $tp_status_table = FALSE;
+
+    // Get/set triage taxonomy term tid that we're on for reference and load term
+    if (is_null($thistid)) {
+      $tid = 0;
+      $_SESSION['triage']['my_tid'] = NULL;
+    }
+    else {
+      $tid = $thistid;
+      $_SESSION['triage']['my_tid'] = $tid;
+    }
+    if ($go_on) {
+      //$thistid = null;
+    }
+    //  if($_SESSION['triage']['triage_direct_nid']>0){
+    //      $return_js = 0;
+    //  }
+    $thisterm = taxonomy_term_load($tid);
+    if ($thisterm) {
+      $fld = 'field_triage_ref_' . $voc_name;
+      $field = field_get_items('taxonomy_term', $thisterm, $fld);
+      if ($field) {
+        $addtid = $field[0]['tid'];
+      }
+    }
+    // Set page variables
+    $show_last_only = triage_page_field_value($tp_node, 'field_show_last_only', FALSE);
+    $_SESSION['triage']['triage_state_id'] = ta_variable_get('triage_state', '', $tp_node->nid);
+    $tp_status_table = ta_variable_get('triage_status_table', '', $tp_node->nid);
+    if ($tp_status_table) {
+      $tp_status_field = $tp_status_table . "_tid";
+      $tp_status_table = "field_data_" . $tp_status_table;
+    }
+    else {
+      $tp_status_field = '';
+      $tp_status_table = 0;
+    }
+    $tp_top_text = ta_variable_get('triage_top_text', 'Please choose the issue you need help with.', $tp_node->nid);
+    $tp_sub_text = t(ta_variable_get('triage_sub_text', 'Select the statement that best describes your legal problem.', $tp_node->nid));
+    $one_state_vals = ta_variable_get('triage_one_state_text', '', $tp_node->nid);
+    if (!isset($one_state_vals['value'])) {
+      $one_state_text = '';
+    }
+    else {
+      $tp_one_state_text = $one_state_vals['value'];
+    }
+    $check_private = db_table_exists('field_data_field_triage_keep_private')
+      && db_field_exists('field_data_field_triage_keep_private', 'field_triage_keep_private_value');
+    $_SESSION['triage']['location_success'] = $tp_one_state_text;
+  }
+
+  // GROUP AND PROGRESS BAR SETUP
+  if (TRUE) {
+    // Get the Node Triage Actions
+    // First check for groups
+    $grp_array = db_query("select id from triage_actions 
+                        where bundle='node'
+                        and type = 'group'
+                        and entity_id = :entity_id
+                        order by weight", array(':entity_id' => $nid))->fetchCol();
+    $group_num = count($grp_array);
+    $group_text = array();
+    $steps = array();
+    foreach ($grp_array as $grp) {
+      $group_text[$grp] = triage_group_text($grp);
+      $steps[] = $grp;
+    }
+    //watchdog('bds',serialize($group_text));
+    $steps[] = 0;
+    $my_group = array($group_text);
+    drupal_add_js(array('my_group' => $group_text), 'setting');
+    drupal_add_js(array('sa_url' => $_SESSION['triage']['triage_sa_extra']), 'setting');
+    drupal_add_js(array('my_steps' => $steps), 'setting');
+    $my_progress_bar = array();
+    $my_progress_bar['background'] = ta_variable_get('triage_progress_background', "#fff", $nid);
+    $my_progress_bar['border'] = ta_variable_get('triage_progress_border', "#aaa", $nid);
+    $my_progress_bar['selected_back'] = ta_variable_get('triage_progress_selected_background', "#133785", $nid);
+    $my_progress_bar['text'] = ta_variable_get('triage_progress_text', "#000", $nid);
+    $my_progress_bar['selected_text'] = ta_variable_get('triage_progress_selected_text', "#fff", $nid);
+    $my_progress_bar['icon_color'] = ta_variable_get('triage_progress_icon_color', "#aaa", $nid);
+    $my_progress_bar['title'] = t(ta_variable_get('triage_progress_bar_title', "Triage Progress", $nid));
+    $my_progress_bar['extra_step'] = ta_variable_get('triage_progress_extra_step', FALSE, $nid);
+    $my_progress_bar['type'] = ta_variable_get('triage_progress_type', 'bar', $nid);
+    $my_progress_bar['step_text'] = t('Step');
+    drupal_add_js(array('my_progress_bar' => $my_progress_bar), 'setting');
+    // Graphic Display for Steps
+    if (ta_variable_get('triage_use_progress_bar', FALSE, $nid)
+      && ta_variable_get('triage_progress_type', 'bar', $nid) == 'bar'
+    ) {
+      if (is_null($thistid) || $progress_end || $groupid == "-1") {
+        //Set variables
+        $progress_title = ta_variable_get('triage_progress_bar_title', "Triage Progress", $nid);
+        $num = count($steps);
+        if (ta_variable_get('triage_progress_extra_step', FALSE, $nid)) {
+          $num++;
+        }
+        $_SESSION['triage']['triage_total_steps'] = $num;
+        $step_width = 95 / ($num);
+        $output .= '<div class="triage-progress-container">';
+        $output .= '<div class="triage-progress-bar" >' . $progress_title . ' (Step 1 of ' . ($num) . ')</div>';
+        $output .= '<div class="triage-steps">';
+        $x = 1;
+        foreach ($group_text as $key => $grp) {
+          $classes = 'triage-step';
+          $icon_class = ' ';
+          if ($x == 1) {
+            $classes .= ' active step-in-use first ';
+          }
+          else {
+            if ($progress_end || $groupid == "-1") {
+              $classes .= ' active step-in-use ';
+            }
+          }
+          $output .= "<div id='step-" . $key . "' class='" . $classes . "' style='width:" . $step_width . "%;'><div class='triage-step-num'>" . $x . ". </div><div class='triage-step-text'>" . $grp . "</div></div>";
+          if ($x == 1) {
+            $icon_class = ' active step-in-use ';
+          }
+          else {
+            if ($progress_end || $groupid == "-1") {
+              $icon_class .= ' active step-in-use ';
+            }
+          }
+          $output .= "<div id='icon-" . $key . "' class='triage-step-icon " . $icon_class . "'><i class='fa fa-play fa-2x'></i></div>";
+          $x++;
+        }
+        if (ta_variable_get('triage_progress_extra_step', FALSE, $nid)) {
+          $classes = ' triage-step ';
+          $output .= "<div id='step-0' class='" . $classes . "' style='width:" . $step_width . "%;'><div class='triage-step-num'>" . $x . ". </div><div class='triage-step-text'>" . t("Legal Issue") . "</div></div>";
+          $output .= "<div id='icon-0' class='triage-step-icon " . $icon_class . "'><i class='fa fa-play fa-2x'></i></div>";      //$output .= "<div class='triage-step-icon'><i class='fa fa-play'></i></div>";
+          if ($progress_end || $groupid == "-1") {
+            $classes = ' active triage-step last clearfix2 ';
+          }
+          else {
+            $classes = ' triage-step last clearfix2 ';
+          }
+          $results_text = t(ta_variable_get('triage_progress_extra_step_text', "Results", $nid));
+          $output .= "<div id='step-last' class='" . $classes . "' style='width:" . $step_width . "%;'><div class='triage-step-num'>" . ($num) . ". </div>" . $results_text . "</div>";
+          $output .= "<div id='icon-last' class='triage-step-icon " . $icon_class . "'><i class='fa fa-step-forward fa-2x'></i></div>";      //$output .= "<div class='triage-step-icon'><i class='fa fa-play'></i></div>";
+        }
+        else {
+          if ($progress_end || $groupid == "-1") {
+            $classes = ' active triage-step last clearfix2 ';
+          }
+          else {
+            $classes = ' triage-step last clearfix2 ';
+          }
+          $output .= "<div id='step-0' class='" . $classes . "' style='width:" . $step_width . "%;'><div class='triage-step-num'>" . $num . ". </div><div class='triage-step-text'>" . t("Legal Issue") . "</div></div>";
+          $output .= "<div id='icon-0' class='triage-step-icon " . $icon_class . "'><i class='fa fa-play fa-2x'></i></div>";      //$output .= "<div class='triage-step-icon'><i class='fa fa-play'></i></div>";
+        }
+        $output .= '</div></div>';
+      }
+    }
+    $thisgroup = $groupid;
+    switch ($groupid) {
+      case -1:
+        break;
+      case 0:
+        break;
+      default:
+        $key = array_search($groupid, $grp_array);
+        if ($key - 1 < count($grp_array)) {
+          $thisgroup = $grp_array[$key + 1];
+        }
+        else {
+          $thisgroup = 0;
+        }
+    }
+  }
+
+  // TOP LEVEL CODE
+  // Start top category run
+  $triage_item = 0;
+  // Start constructing question navigation
+  // If no tid is passed show menu of top-level items
+
+  if ($tid == 0) {
+    $bypass = !triage_get_details(TRUE);
+    if ($_SESSION['triage']['triage_change_info']) {
+      $bypass = FALSE;
+    }
+    // Get the preliminary screens
+    if (!$bypass) {
+      $_SESSION['triage']['triage_change_info'] = FALSE;
+      $_SESSION['triage']['triage_done_that'] = TRUE;
+      if ($thisgroup >= 0 && $group_num > 0) {
+        $_SESSION['triage']['triage_in_questions'] = 0;
+        if ($thisgroup == 0) {
+          $_SESSION['triage']['triage_history'] = '';
+          $gid = $grp_array[0];
+          $_SESSION['triage']['triage_last_stop'] = $group_text[$gid];
+          $_SESSION['triage']['triage_history'] .= $group_text[$gid];
+        }
+        $items = triage_actions_get_by_parent($nid, 0, 'node');
+        triage_actions_get_action($items, $output, $nid, "node");
+        $output .= '<div class="triage-content">';
+        if ($return_js) {
+          header('Content-Type: application/javascript Access-Control-Allow-Origin: ' . $base_url);
+          return drupal_json_output($output);
+        }
+        else {
+          $output = "<div class='triage-main-body'>" . $output . "</div>";
+          if ($my_alt_display['use_alt']) {
+            $output = '<div id="triage-page-wrapper">' . $output . "</div>";
+          }
+          return $output;
+        }
+      }
+      else {
+        $output .= '<div class="triage-content">';
+      }
+    }
+    else {
+      $output .= '<div class="triage-content">';
+    }
+  }
+  else {
+    $output .= '<div class="triage-content">';
+  }
+  drupal_add_js(array('bypass_questions' => $bypass), 'setting');
+  // Start constructing question navigation
+  // If no tid is passed show menu of top-level items
+  if (isset($_SESSION['triage']['triage_direct_nid']) && $_SESSION['triage']['triage_direct_nid'] > 0) {
+    $_SESSION['triage']['triage_no_you_said'] = TRUE;
+    $tid = $_SESSION['triage']['triage_direct_nid'];
+    $thistid = $_SESSION['triage']['triage_direct_nid'];
+    $_SESSION['triage']['triage_direct_nid'] = 0;
+    $_SESSION['triage']['triage_in_questions'] = 1;
+  }
+  $previd = 0;
+  if ($group_num > 0) {
+    $previd = $grp_array[($group_num - 1)];
+    $prev = 'prev-' . $previd;
+  }
+  else {
+    $prev = '';
+  }
+  if ($tid == 0) {
+    $output .= "<div class='ta-message-panel'>";
+    $items = triage_actions_get_by_parent($nid, 0, 'quests', 'ta-message-panel');
+    triage_actions_get_action($items, $output, $nid, "quests", 'ta-message-panel');
+    $output .= "</div>";
+    if (!isset($_COOKIE['triage_hist'])) {
+      setcookie('triage_hist', '', time() + (86400 * 30), "/");
+    }
+    else {
+      $_SESSION['triage']['triage_history'] .= $_COOKIE['triage_hist'];
+    }
+    if (!isset($_COOKIE['triage_last'])) {
+      setcookie('triage_last', '', time() + (86400 * 30), "/");
+    }
+    else {
+      $_SESSION['triage']['triage_last_stop'] = $_COOKIE['triage_last'];
+    }
+    $_SESSION['triage']['triage_in_questions'] = 1;
+    $_SESSION['triage']['triage_history'] .= ">>Category: ";
+    if ($triage_nav_type == 'split' && $previd > 0) {
+      $lefticon = '<i class="fa ' .
+        ta_variable_get('triage_reset_left_icon', '', $nid) . '"></i>';
+      $righticon = '<i class="fa ' .
+        ta_variable_get('triage_reset_right_icon', '', $nid) . '"></i>';
+      $classes = 'triage-group-reset';
+      if ($_SESSION['triage']['triage_done_that'] || $bypass) {
+        $classes .= ' bypass';
+      }
+
+      $output .= "<div class='" . $classes . " " . $prev . "'>" .
+        $lefticon . t(' ' . $backtext . ' ') . $righticon . "</div>";
+    }
+    if (!ta_variable_get('triage_use_own_word', TRUE, $nid)) {
+      $output .= "<div class='triage-cat-text'>" . t($tp_top_text) . "</div>";
+    }
+    $query = db_select('taxonomy_term_data', 't');
+    $query->addField('t', 'tid');
+    $query->innerJoin('taxonomy_vocabulary', 'v', 'v.vid=t.vid');
+    $query->innerJoin('taxonomy_term_hierarchy', 'h', 'h.tid=t.tid');
+    $query->condition('h.parent', $tid)
+      ->condition('v.vid', $vid);
+    if ($tp_status_table) {
+      $db_or = db_or();
+      $db_or->condition("s." . $tp_status_field, NULL);
+      $db_or->condition($tp_status_field, $status, 'IN');
+      $query->leftJoin($tp_status_table, 's', 's.entity_id=t.tid');
+      $query->condition($db_or);
+    }
+    if ($check_private) {
+      $db_or1 = db_or();
+      $db_or1->condition("p.field_triage_keep_private_value", NULL);
+      $db_or1->condition("p.field_triage_keep_private_value", 0);
+      $query->leftJoin('field_data_field_triage_keep_private', 'p', 'p.entity_id=t.tid');
+      $query->condition($db_or1);
+    }
+    $query->orderBy('t.weight');
+    $items = $query->execute();
+    $num_items = $query->countQuery()->execute()->fetchField();
+
+    // ADD PLAIN TEXT SEARCH
+    if (TRUE) {
+      if (ta_variable_get('triage_use_own_word', TRUE, $nid)) {
+        $output .= "<div class='triage-own-words'>";
+        $form = drupal_get_form('triage_problem_form');
+        $class = "";
+        $output .= "<div class='triage-action-form " . $class . "'>";
+        $formtitle = ta_variable_get('triage_own_words_title', "Describe your problem in your own words...", $nid);
+        $output .= "<h4>" . t($formtitle) . '</h4>';
+        $output .= render($form);
+        $output .= "</div></div>";
+        $output .= "<div class='triage-top with-own-words'>";
+      }
+      else {
+        $output .= "<div class='triage-top'>";
+      }
+    }
+    if (ta_variable_get('triage_use_own_word', TRUE, $nid)) {
+      $output .= "<div class='triage-cat-text'><span class='triage-or'>OR</span>" . t($tp_top_text) . "</div>";
+    }
+    foreach ($items as $item) {
+      if ($num_items == 1) {
+        $triage_item = $item->tid;
+      }
+      $term = taxonomy_term_load($item->tid);
+      if (module_exists('i18n_taxonomy') && $term) { //To not break your site if module is not installed
+        $term = i18n_taxonomy_localize_terms($term); // The important part!
+      }
+      $numkids = count(taxonomy_get_children($term->tid));
+      $output .= "<div class='triage-row trow-" . $term->tid . "'>";
+      $image = field_get_items('taxonomy_term', $term, 'field_icon');
+      if ($image) {
+        $img = field_view_value('taxonomy_term', $term, 'field_icon', $image[0]);
+        if (count($img) > 0) {
+          $output .= "<div class='triage-image'>" . render($img) . "</div>";
+          $output .= "<div class='triage-title'>" . t($term->name) . "</div>";
+        }
+      }
+      else {
+        $output .= "<div class='triage-title triage-button'>" . t($term->name) . "</div>";
+      }
+      if (!is_array(t($term->description))) {
+        $output .= "<div class='triage-description'>" . t($term->description) . "</div>";
+      }
+      $output .= "</div>";
+    }
+    $output .= "</div>";
+    if ($triage_nav_type == 'bottom' && $previd > 0) {
+      $output .= "<div class='ta-nav-bar'>";
+      $lefticon = '<i class="fa ' .
+        ta_variable_get('triage_reset_left_icon', 'fa-chevron-circle-left', $nid) . '"></i>';
+      $righticon = '<i class="fa ' .
+        ta_variable_get('triage_reset_right_icon', 'fa-chevron-circle-right', $nid) . '"></i>';
+      $classes = 'triage-group-reset';
+      if ($_SESSION['triage']['triage_done_that'] || $bypass) {
+        $classes .= ' bypass';
+      }
+      $output .= "<div class='" . $classes . " " . $prev . "'>" .
+        $lefticon . t(' ' . t($backtext) . ' ') . $righticon . "</div>";
+    }
+  }
+  else {
+    // Get top and last items for display, then assemble the kids
+    $output .= "<div class='ta-message-panel'>";
+    $items = triage_actions_get_by_parent($nid, 0, 'quests', 'ta-message-panel');
+    triage_actions_get_action($items, $output, $nid, "quests", 'ta-message-panel');
+    $output .= "</div>";
+    $output .= '<div class="ta-main-panel">';
+    $_SESSION['triage']['triage_in_questions'] = 1;
+    $term = taxonomy_term_load($tid);
+    if (!is_null($term->name)) {
+      $chkit = $_SESSION['triage']['my_path'];
+      $del = FALSE;
+      foreach ($chkit as $key => $value) {
+        if ($key == $tid) {
+          $del = TRUE;
+          unset($_SESSION['triage']['my_path'][$key]);
+        }
+        if ($del) {
+          unset($_SESSION['triage']['my_path'][$key]);
+        }
+      }
+      $_SESSION['triage']['my_path'][$term->tid] = $term->name;
+    }
+    $thisparent = taxonomy_get_parents($tid);
+    if (count($thisparent) == 0) {
+      $_SESSION['triage']['triage_history'] .= $term->name;
+    }
+    else {
+      $_SESSION['triage']['triage_history'] .= ">>" . $term->name;
+    }
+    $_SESSION['triage']['triage_last_stop'] = $term->name;
+    if (module_exists('i18n_taxonomy') && $term) { //To not break your site if module is not installed
+      $term = i18n_taxonomy_localize_terms($term); // The important part!
+    }
+    $parents = taxonomy_get_parents_all($tid);
+    $reversed = array_reverse($parents);
+    $x = 0;
+    // Setup Drupal.settings variable that will have the full hierarchy of tids for navigation
+    $tids = array();
+    foreach ($reversed as $rev) {
+      $tids[$x] = $rev->tid;
+      $x++;
+    }
+    $my_triage = array(
+      'item' => array(),
+      'tid' => $tids,
+      'cat_text' => $tp_top_text,
+      'sub_text' => "",
+      'vocab' => t($voc_name),
+    );
+    $toplevel = FALSE;
+    if (count($parents) == 1) {
+      $toplevel = TRUE;
+    }
+    // Top level display
+    $top = $parents[count($parents) - 1];
+    $output .= "<div class='triage-path-content clearfix'>";
+    if ($toplevel) {
+      $output .= "<div class='ta-answers-left no-right-border'>";
+    }
+    else {
+      $output .= "<div class='ta-answers-left'>";
+    }
+    if ($top) {
+      $_SESSION['triage']['triage_info'] = "";
+      //$output .= "<div class='triage-auto'>";
+      if (module_exists('i18n_taxonomy') && $term) { //To not break your site if module is not installed
+        $top = i18n_taxonomy_localize_terms($top); // The important part!
+      }
+      $numkids = count(taxonomy_get_children($top->tid));
+      if ($numkids == 0) {
+        $submit_text = ta_variable_get('triage_submit_text', 'Submit', $nid);
+        $output .= "<div class='nokids triage-selected trow-" . $top->tid . "'>";
+        $output .= "<hr /><div class='triage-submit'>" . t($submit_text) . "</div>";
+      }
+      else {
+        $output .= "<div class='triage-selected trow-" . $top->tid . "'>";
+      }
+      $image = field_get_items('taxonomy_term', $top, 'field_icon');
+      if ($image) {
+        $img = field_view_value('taxonomy_term', $top, 'field_icon', $image[0]);
+        $output .= "<div class='triage-image'>" . render($img) . "</div>";
+        $output .= "<div class='triage-title'>" . t($top->name) . "</div>";
+      }
+      else {
+        $output .= "<div class='triage-title triage-button'>" . t($top->name) . "</div>";
+      }
+      $output .= "</div>";
+      $output .= "</div>";
+    }
+    // Last picked level display
+    $output .= "<div class='ta-answers-right'>";
+    //
+    if ($show_last_only) {
+      if (!$toplevel and count($parents) > 1) {
+        $last = $parents[1];
+        if ($last && ($top->tid != $last->tid)) {
+          $output .= "<div class='triage-last'>";
+          if (module_exists('i18n_taxonomy') && $last) { //To not break your site if module is not installed
+            $last = i18n_taxonomy_localize_terms($last); // The important part!
+          }
+          $output .= t($last->name);
+          $output .= "</div>";
+        }
+      }
+      if ($term->tid != $top->tid) {
+        $output .= "<div class='triage-selected-last'>" . $term->name . "</div>";
+      }
+      $output .= "</div>";
+    }
+    else {
+      $said = FALSE;
+      //$reversed = $_SESSION['triage']['my_path'];
+      $chkdupes = array();
+      foreach ($reversed as $p) {
+        //foreach ($reversed as $key => $value) {
+        //$p = taxonomy_term_load($key);
+        if ($p->tid == $term->tid || $p->tid == $top->tid) {
+          continue;
+        }
+        if (in_array($p->name, $chkdupes)) {
+          continue;
+        }
+        $output .= "<div class='triage-show'>";
+        if (module_exists('i18n_taxonomy') && $term) { //To not break your site if module is not installed
+          $p = i18n_taxonomy_localize_terms($p); // The important part!
+        }
+        if (!$said) {
+          if ($_SESSION['triage']['triage_no_you_said']) {
+            $_SESSION['triage']['triage_no_you_said'] = FALSE;
+          }
+          else {
+            $in_text = t("You said");
+            if ($language->language=="es"){
+              $in_text = "Usted dijo";
+            }
+            $output .= "<div class='first-no'>" . $in_text . " :</div>";
+            $said = TRUE;
+          }
+        }
+        $chkdupes[] = $p->name;
+        $output .= "- " . t($p->name);
+        $output .= "</div>";
+      }
+
+      if ($term->tid != $top->tid) {
+        if (!$said) {
+          if ($_SESSION['triage']['triage_no_you_said']) {
+            $_SESSION['triage']['triage_no_you_said'] = FALSE;
+          }
+          else {
+            $output .= "<div class='second-no'>" . $in_text .  " :</div>";
+            $said = TRUE;
+          }
+        }
+        $_SESSION['triage']['triage_info'] = $term->description;
+        $output .= "<div class='triage-selected'>- " . $term->name . "</div>";
+        $output .= "</div>";
+      }
+      else {
+        $output .= "</div>";
+      }
+    }
+    $output .= "</div>";
+    // 
+    // Currently selected Item
+    if ($triage_nav_type == 'split') {
+      $lefticon = '<i class="fa ' .
+        ta_variable_get('triage_reset_left_icon', 'fa-chevron-circle-left', $nid) . '"></i>';
+      $righticon = '<i class="fa ' .
+        ta_variable_get('triage_reset_right_icon', 'fa-chevron-circle-right', $nid) . '"></i>';
+      $output .= "<div class='triage-reset " . $prev . "'>" .
+        $lefticon . t(' ' . $backtext . ' ') . $righticon . "</div>";
+    }
+    // Get the kids, filtering for Status
+    $query = db_select('taxonomy_term_data', 't');
+    $query->addField('t', 'tid');
+    $query->innerJoin('taxonomy_vocabulary', 'v', 'v.vid=t.vid');
+    $query->innerJoin('taxonomy_term_hierarchy', 'h', 'h.tid=t.tid');
+    $query->condition('h.parent', $tid)
+      ->condition('v.vid', $vid);
+    if ($tp_status_table) {
+      $db_or = db_or();
+      $db_or->condition("s." . $tp_status_field, NULL);
+      $db_or->condition($tp_status_field, $status, 'IN');
+      $query->leftJoin($tp_status_table, 's', '(s.entity_id=t.tid and s.entity_type=:etype)', array(":etype" => "taxonomy_term"));
+      $query->condition($db_or);
+    }
+    if ($check_private) {
+      $db_or1 = db_or();
+      $db_or1->condition("p.field_triage_keep_private_value", NULL);
+      $db_or1->condition("p.field_triage_keep_private_value", 0);
+      $query->leftJoin('field_data_field_triage_keep_private', 'p', 'p.entity_id=t.tid');
+      $query->condition($db_or1);
+    }
+    $query->orderBy('t.weight');
+    //watchdog('bt',  triage_dpq($query,TRUE));
+    $items = $query->execute();
+    $items_cnt = $items->rowCount();
+    if ($items_cnt == 0 && is_null($addtid)) {
+    }
+    else {
+      $output .= "<div class='triage-sub-text'>" . t($tp_sub_text) . "</div>";
+      $output .= "<div class='triage-kids'>";
+      // First check for pointers to other sections of questions, as identified by $addtid
+      // Add questions
+      if ($addtid) {
+        $query = db_select('taxonomy_term_data', 't');
+        $query->addField('t', 'tid');
+        $query->innerJoin('taxonomy_vocabulary', 'v', 'v.vid=t.vid');
+        $query->innerJoin('taxonomy_term_hierarchy', 'h', 'h.tid=t.tid');
+        $query->condition('h.parent', $addtid)
+          ->condition('v.vid', $vid);
+        if ($tp_status_table) {
+          $db_or = db_or();
+          $db_or->condition("s." . $tp_status_field, NULL);
+          $db_or->condition($tp_status_field, $status, 'IN');
+          $query->leftJoin($tp_status_table, 's', 's.entity_id=t.tid');
+          $query->condition($db_or);
+        }
+        if ($check_private) {
+          $db_or1 = db_or();
+          $db_or1->condition("p.field_triage_keep_private_value", NULL);
+          $db_or1->condition("p.field_triage_keep_private_value", 0);
+          $query->leftJoin('field_data_field_triage_keep_private', 'p', 'p.entity_id=t.tid');
+          $query->condition($db_or1);
+        }
+        $query->orderBy('t.weight');
+        $xitems = $query->execute();
+        foreach ($xitems as $xitem) {
+          $myhelp = '';
+          $addterm = taxonomy_term_load($xitem->tid);
+          if (module_exists('i18n_taxonomy') && $term) { //To not break your site if module is not installed
+            $addterm = i18n_taxonomy_localize_terms($addterm); // The important part!
+          }
+          $numkids = count(taxonomy_get_children($addtid));
+          if (isset($term->field_triage_help['und'])) {
+            $myhelp = $addterm->field_triage_help['und'][0]['value'];
+          }
+          if ($myhelp > '') {
+            $classes .= 'tr-help ';
+          }
+          if ($numkids == 0) {
+            $classes .= " nokids ";
+          }
+          $output .= "<div class='" . $classes . " triage-row trow-" . $addterm->tid . "'>";
+          $output .= "<div class='triage-kid-title'>" . t($addterm->name) . "</div>";
+          $output .= "<div class='hidden triage-help thelp-" . $addterm->tid . "'>" . $myhelp . "</div>";
+          $output .= "</div>";
+        }
+      }
+      // Now add kids to display
+      foreach ($items as $item) {
+        $myhelp = '';
+        $term = taxonomy_term_load($item->tid);
+        if (module_exists('i18n_taxonomy') && $term) { //To not break your site if module is not installed
+          $term = i18n_taxonomy_localize_terms($term); // The important part!
+        }
+        $numkids = count(taxonomy_get_children($term->tid));
+        $classes = '';
+        if (isset($term->field_triage_help['und'])) {
+          $myhelp = $term->field_triage_help['und'][0]['value'];
+        }
+        if ($myhelp > '') {
+          $classes .= 'tr-help ';
+        }
+        if ($numkids == 0) {
+          $classes .= " nokids ";
+        }
+        $output .= "<div class='" . $classes . " triage-row trow-" . $term->tid . "'>";
+        $output .= "<div class='triage-kid-title'>" . t($term->name) . "</div>";
+        if ($myhelp > '') {
+          $output .= "<div class='hidden triage-help thelp-" . $term->tid . "'>" . $myhelp . "</div>";
+        }
+        $output .= "</div>";
+      }
+    }
+    if ($triage_nav_type == 'bottom') {
+      $output .= "<div class='ta-nav-bar'>";
+      $lefticon = '<i class="fa ' .
+        ta_variable_get('triage_reset_left_icon', 'fa-chevron-circle-left', $nid) . '"></i>';
+      $righticon = '<i class="fa ' .
+        ta_variable_get('triage_reset_right_icon', 'fa-chevron-circle-right', $nid) . '"></i>';
+      //      if (ta_variable_get('triage_custom_css', '', $nid) > "") {
+      //        $lefticon = '';
+      //        $righticon = '';
+      //      }
+      $output .= "<div class='triage-reset " . $prev . "'>" .
+        $lefticon . ' ' . t($backtext) . ' ' . $righticon . "</div>";
+      //$output .= "<div class='triage-reset'>" . t($backtext) . "</div>";
+    }
+    if ($items_cnt == 0 && !$addtid) {
+      if ($triage_nav_type == 'split') {
+        $output .= "<hr />";
+      }
+      if (ta_variable_get('triage_restart_nav_bar', FALSE, $nid)) {
+        $start_text = t(ta_variable_get('triage_restart_text', 'Start Again', $nid));
+        $output .= "<div class='triage-restart'>" . t($start_text) . "</div>";
+      }
+      $submit_text = ta_variable_get('triage_submit_text', 'Submit', $nid);
+      if($language->language == "es"){
+        $submit_text = "Enviar";
+      }
+      $output .= "<div class='triage-submit'>" . t($submit_text) . "</div>";
+    }
+    else {
+      if (ta_variable_get('triage_restart_nav_bar', FALSE, $nid)) {
+        $start_text = t(ta_variable_get('triage_restart_text', 'Start Again', $nid));
+        $output .= "<div class='triage-restart'>" . t($start_text) . "</div>";
+      }
+    }
+    $output .= "</div></div>";
+    if ($triage_nav_type == 'bottom') {
+      $output .= "</div>";
+    }
+    // Add help and bottom panel actions
+    $output .= "<div class='ta-help-panel'>";
+    $items = triage_actions_get_by_parent($nid, 0, 'quests', 'ta-help-panel');
+    triage_actions_get_action($items, $output, $nid, "quests", 'ta-help-panel');
+    $output .= "</div>";
+    $output .= "<div class='ta-bottom-panel'>";
+    $items = triage_actions_get_by_parent($nid, 0, 'quests', 'ta-bottom-panel');
+    triage_actions_get_action($items, $output, $nid, "quests", 'ta-bottom-panel');
+    $output .= "</div>";
+    // End help and bottom panels
+  }
+  drupal_add_js(array('my_triage' => $my_triage), 'setting');
+  drupal_add_js(array('triage_item' => $triage_item), 'setting');
+  if ($return_js) {
+    header('Content-Type: application/javascript Access-Control-Allow-Origin: ' . $base_url);
+    $output = "<div class='triage-main-body'>" . $output . "</div>";
+    return drupal_json_output($output);
+  }
+  else {
+    $output = "<div class='triage-main-body'>" . $output . "</div>";
+    if ($my_alt_display['use_alt']) {
+      $output = '<div id="triage-page-wrapper">' . $output . "</div>";
+    }
+    return $output;
+  }
+}
+
+function triage_post() {
+  $flags = flag_get_user_flags('node');
+  $flag = flag_get_flag('county');
+  $data = $_POST;
+  foreach ($data as $dats) {
+    foreach ($dats as $d) {
+      $frm = $d['form'];
+      $inp = rtrim($d['inputs'], ",");
+      $ans = rtrim($d['values'], ",");
+      switch ($frm) {
+        case "triage-in-service-area-form" :
+          $_SESSION['triage']['triage_non_service_area'] = $ans;
+          break;
+        case "triage-location-form" :
+          $vals = explode(",", $ans);
+          $_SESSION['triage']['triage_who_is'] = $vals[0];
+          $_SESSION['triage']['triage_in_service_area'] = $vals[1];
+          if ($vals[1] == '1') {
+            $_SESSION['triage']['triage_non_service_area'] = '0';
+          }
+          else {
+            $_SESSION['triage']['triage_non_service_area'] = '1';
+          }
+
+          $_SESSION['triage']['my_county'] = $vals[2];
+          global $user;
+          $account = user_load($user->uid);
+          $nid = db_query('select nid from node where title = :ttl', array(':ttl' => $vals[2]))->fetchColumn();
+          flag('flag', 'county', $nid, $account);
+          $_SESSION['triage']['triage_kind_of_help'] = $vals[3];
+
+          break;
+        case "triage-status-form" :
+          $vals = explode(",", $ans);
+          $status = array();
+          foreach ($vals as $val) {
+            if ($val > '') {
+              $status[$val] = $val;
+            }
+          }
+          $_SESSION['triage']['triage_status'] = $status;
+          break;
+        case "triage-zip-form" :
+          $pl = $ans;
+          $myplace = triage_zip_data($pl);
+          if (isset($myplace['success']) && $myplace['success']) {
+            $_SESSION['triage']['location_success'] = TRUE;
+            $_SESSION['triage']['my_zip'] = $myplace['zip'];
+            $_SESSION['triage']['my_town'] = $myplace['city'];
+            $_SESSION['triage']['my_county'] = $myplace['county'];
+            $_SESSION['triage']['my_lat'] = $myplace['latitude'];
+            $_SESSION['triage']['my_long'] = $myplace['longitude'];
+          }
+          break;
+        case "triage-pov-form" :
+          $vals = explode(",", $ans);
+          $_SESSION['triage']['my_house_size'] = $vals[0];
+          $inc = str_replace(",", "", $vals[1]);
+          $_SESSION['triage']['my_house_income'] = $inc;
+          break;
+        case "triage-income-form" :
+          watchdog('bds', serialize($ans));
+          $vals = explode(",", $ans);
+          //watchdog('bds',$vals[3]);
+          $_SESSION['triage']['triage_live_alone'] = $vals[0];
+          if ($vals[0] == '0') {
+            $_SESSION['triage']['my_house_size'] = 1;
+          }
+          else {
+            $_SESSION['triage']['my_house_size'] = $vals[1] + 1;
+          }
+          $inc = str_replace(",", "", $vals[2]);
+          $_SESSION['triage']['my_house_income'] = $inc;
+          $_SESSION['triage']['triage_income_period'] = $vals[3];
+          $benefits = array();
+          $benvals = array_slice($vals, 4);
+          foreach ($benvals as $val) {
+            if ($val > '') {
+              $benefits[$val] = $val;
+            }
+          }
+          $_SESSION['triage']['my_benefits'] = $benefits;
+          //watchdog('bds',serialize($benefits));
+          break;
+        case "triage-followup-form" :
+          $vals = explode(",", $ans);
+          $factors = array();
+          foreach ($vals as $val) {
+            if ($val > '') {
+              $factors[$val] = $val;
+            }
+          }
+          $_SESSION['triage']['factors'] = $factors;
+          break;
+      }
+    }
+    $stop = '';
+  }
+  $bds = '';
+}
+
+function triage_get_zip($form, $form_state) {
+  $nid = $_SESSION['triage']['triage_page_nid'];
+  $triage_state = ta_variable_get('triage_state', '', $nid);
+  $site_state = $_SESSION['triage']['triage_state_id'];
+  if ($triage_state == "-None-") {
+    $site_state = "";
+  }
+  $out = '';
+  $pl = $form_state['values']['triage_zip'];
+  if ($pl == "000") {
+    $out .= "<div class='found-zip' >Unknown city and zipcode</div>";
+    $_SESSION['triage']['location_success'] = TRUE;
+    $_SESSION['triage']['my_zip'] = "000";
+    $myplace['zip'] = "000";
+    $_SESSION['triage']['my_town'] = "Unknown";
+    $myplace['city'] = "Unknown";
+    $_SESSION['triage']['my_county'] = "Unknown";
+    $myplace['county'] = "Unknown";
+    $_SESSION['triage']['my_lat'] = 0;
+    $myplace['latitude'] = 0;
+    $_SESSION['triage']['my_long'] = 0;
+    $_SESSION['triage']['my_state'] = '';
+    $myplace['longitude'] = 0;
+    drupal_add_js(array('zip_code_success' => TRUE), 'setting');
+  }
+  else {
+    $x = 0;
+    while($x<3) {
+      $x++;
+      $myplace = triage_zip_data($pl);
+      if (isset($myplace['success']) && $myplace['success']) {
+        $x=4;
+      }
+    }
+    if (isset($myplace['success']) && $myplace['success']) {
+      $out .= "<div class='found-zip'>" . $myplace['city'] . ", " . triage_state_name($myplace['state']) . " " . $myplace['zip'];
+      $out .= " " . " ~ County: " . $myplace['county'] . "</div>";
+      $_SESSION['triage']['location_success'] = TRUE;
+      $_SESSION['triage']['my_zip'] = $myplace['zip'];
+      $_SESSION['triage']['my_town'] = $myplace['city'];
+      $_SESSION['triage']['my_county'] = $myplace['county'];
+      $_SESSION['triage']['my_lat'] = $myplace['latitude'];
+      $_SESSION['triage']['my_long'] = $myplace['longitude'];
+      $_SESSION['triage']['my_state'] = triage_state_name($myplace['state']);
+      drupal_add_js(array('zip_code_success' => TRUE), 'setting');
+    }
+    else {
+      //$out .= "<div class='city-fail'>The city or zipcode you entered is not recognized for " . triage_state_name($site_state) . "<br />";
+      $out .= "<div class='city-fail'>The city or zipcode you entered is not recognized <br />";
+      //$out .= "<p>" . $_SESSION['triage']['location_success'] . "</p>";
+      $out .= "</div>";
+      $_SESSION['triage']['location_success'] = FALSE;
+      $_SESSION['triage']['my_zip'] = "";
+      $_SESSION['triage']['my_town'] = "";
+      $_SESSION['triage']['my_county'] = "";
+      $_SESSION['triage']['my_lat'] = "";
+      $_SESSION['triage']['my_long'] = "";
+      $_SESSION['triage']['my_state'] = '';
+      drupal_add_js(array('zip_code_success' => FALSE), 'setting');
+    }
+  }
+
+  $commands = array();
+  $commands[] = ajax_command_html('#triage_city', $out);
+  return array(
+    '#type' => 'ajax',
+    '#commands' => $commands,
+  );
+}
+
+function triage_get_service_area($form, $form_state) {
+  $_SESSION['triage']['triage_non_service_area'] = $form_state['input']['triage_area'];
+  //$_SESSION['triage']['my_senior'] = $form_state['values']['triage_senior'];
+  return;
+}
+
+function triage_get_size($form, $form_state) {
+  $_SESSION['triage']['my_house_size'] = $form_state['values']['triage_household'];
+  return;
+}
+
+function triage_get_income($form, $form_state) {
+  $inc = $form_state['values']['triage_income'];
+  $inc = str_replace(",", "", $inc);
+  $_SESSION['triage']['my_house_income'] = $inc;
+  return;
+}
+
+function triage_get_bank($form, $form_state) {
+  $_SESSION['triage']['triage_bank_amt'] = str_replace(",", "", $form_state['values']['triage_bank_amt']);
+  return;
+}
+
+function triage_get_status($form, $form_state) {
+  //  $_SESSION['triage']['triage_status'] = array();
+  //  $status = array_filter($form_state['values']['triage_status']);
+  //  watchdog('bds',implode(",",$status));
+  //  $_SESSION['triage']['triage_status'] = $status;
+  //  $form_state['rebuild'] = true;
+  //  return $form;
+  return;
+}
+
+function triage_zip_data($zip = NULL) {
+  //  watchdog('zip',$zip);
+  $site_state = $_SESSION['triage']['triage_state_id'];
+  if ($site_state == '-None-') {
+    $site_state = "";
+  }
+  $nid = $_SESSION['triage']['triage_page_nid'];
+  $triage_state = ta_variable_get('triage_state', '', $nid);
+  if ($triage_state == "-None-") {
+    $site_state = "";
+  }
+  $data = array();
+  $nozip = FALSE;
+  $data['latitude'] = 0;
+  $data['longitude'] = 0;
+  $data['zip'] = $zip;
+  if ($zip && $zip > "") {
+    //http://maps.google.com/maps/api/geocode/json?address=04643&components=postal_code:04643|administrative_area:ME
+    //$query_url = "http://maps.google.com/maps/api/geocode/json?address=" . $zip;
+    //$query_url .= "&components=";
+    if (is_numeric($zip)) {
+      //$query_url .= "postal_code:" . $zip . "|";
+    }
+    else {
+      $nstart = strpos($zip, ",");
+      if ($nstart !== FALSE) {
+        $zip = substr($zip, 0, $nstart);
+      }
+      $zip .= "," . $site_state;
+      //$query_url .= "locality:" . $zip . "|";
+      $data['zip'] = '';
+      $nozip = TRUE;
+    }
+    $zip = str_replace(" ", "%20", $zip);
+    //$query_url = "http://maps.google.com/maps/api/geocode/json?address=" . $zip;
+    $query_url = "http://maps.google.com/maps/api/geocode/json?components=postal_code:" . $zip."|country:US";
+    //$query_url .= "administrative_area:" . $site_state;
+    watchdog('rpt', $query_url);
+    $session = curl_init($query_url);
+    curl_setopt($session, CURLOPT_RETURNTRANSFER, TRUE);
+    $json = curl_exec($session);
+    if (!$json){
+      $arrContextOptions=array(
+        "ssl"=>array(
+          "verify_peer"=>false,
+          "verify_peer_name"=>false,
+        ),
+      );
+      $json = file_get_contents($query_url, false, stream_context_create($arrContextOptions));
+    }
+    $phpObj = json_decode($json);
+    if (!is_null($phpObj->results)) {
+      foreach ($phpObj->results as $place) {
+        if (!is_null($place->address_components)) {
+          foreach ($place->address_components as $comp) {
+            if (in_array('locality', $comp->types)) {
+              $data['city'] = str_replace("City", "", $comp->short_name);
+            }
+            if (in_array('administrative_area_level_2', $comp->types)) {
+              $data['county'] = str_replace('County', '', $comp->short_name);
+            }
+            if (in_array('administrative_area_level_1', $comp->types)) {
+              $data['state'] = $comp->short_name;
+            }
+          }
+          if (trim($site_state) == '') {
+            if ($data['state'] > '') {
+              $data['success'] = TRUE;
+            }
+          }
+          else {
+            if ($data['state'] == $site_state) {
+              $data['success'] = TRUE;
+            }
+            else {
+              $data['success'] = FALSE;
+            }
+          }
+          //break;
+          if (!is_null($place->geometry)) {
+            $data['latitude'] = $place->geometry->location->lat;
+            $data['longitude'] = $place->geometry->location->lng;
+          }
+        }
+        else {
+          $data['success'] = FALSE;
+        }
+      }
+      if (!isset($data['city']) || trim($data['city']) == '') {
+        $city = $phpObj->results[0]->formatted_address;
+        $pos = strpos($city, ",");
+        $data['city'] = substr($city, 0, $pos);
+      }
+      if (!isset($data['county']) || trim($data['county']) == '') {
+        if ($data['latitude'] > 0) {
+          curl_close($session);
+          $url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=' . $data['latitude'] . "," . $data['longitude'];
+          $session = curl_init($url);
+          curl_setopt($session, CURLOPT_RETURNTRANSFER, TRUE);
+          $json = curl_exec($session);
+          $phpObj = json_decode($json);
+          if (!is_null($phpObj->results)) {
+            foreach ($phpObj->results as $loc) {
+              if (!is_null($loc->address_components)) {
+                foreach ($loc->address_components as $comp) {
+                  if (in_array('administrative_area_level_2', $comp->types)) {
+                    $data['county'] = str_replace('County', '', $comp->short_name);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      if ($nozip && $data['latitude'] > 0) {
+        curl_close($session);
+        $url = 'https://maps.googleapis.com/maps/api/geocode/json?key=AIzaSyBEGIr5mDjtITppPUW5k0vhAYDWldG3X_U&latlng=' . $data['latitude'] . "," . $data['longitude'];
+        $session = curl_init($url);
+        curl_setopt($session, CURLOPT_RETURNTRANSFER, TRUE);
+        $json = curl_exec($session);
+        $phpObj = json_decode($json);
+        if (!is_null($phpObj->results)) {
+          foreach ($phpObj->results as $loc) {
+            if (!is_null($loc->address_components)) {
+              foreach ($loc->address_components as $comp) {
+                if (in_array('postal_code', $comp->types)) {
+                  $data['zip'] = $comp->short_name;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    curl_close($session);
+  }
+  return $data;
+}
+
+function triage_county_data($state = NULL) {
+  $state_abbrev = $state;
+  if (is_null($state)) {
+    $state = $_SESSION['triage']['triage_state_id'];
+    $state_abbrev = $_SESSION['triage']['triage_state_id'];
+  }
+  if (is_null($state)) {
+    return array();
+  }
+  $state = triage_state_name($state);
+  $data = array();
+  //  $data[] = '* No Default';
+  $counties = db_query("select county from triage_counties where state=:state", array(':state' => $state_abbrev))->fetchCol();
+  if (count($counties) == 0) {
+    $yql_base_url = "http://query.yahooapis.com/v1/public/yql";
+    $yql_query = 'select * from geo.counties where place="' . $state . '"';
+    $yql_query_url = $yql_base_url . "?q=" . urlencode($yql_query);
+    $yql_query_url .= "&format=json";
+    $session = curl_init($yql_query_url);
+    curl_setopt($session, CURLOPT_RETURNTRANSFER, TRUE);
+    $json = curl_exec($session);
+    $phpObj = json_decode($json);
+    if (!is_null($phpObj->query->results)) {
+      $counties = $phpObj->query->results->place;
+      foreach ($counties as $county) {
+        $data[$county->name] = $county->name;
+        $nid = db_insert('triage_counties')
+          ->fields(array(
+            'state' => $state_abbrev,
+            'county' => $county->name,
+          ))->execute();
+      }
+    }
+    curl_close($session);
+  }
+  else {
+    foreach ($counties as $county) {
+      $data[$county] = $county;
+    }
+  }
+  asort($data);
+  return $data;
+}
+
+//Admin function to get query string
+function triage_dpq($query, $return = FALSE, $name = NULL) {
+  $query->preExecute();
+  $sql = (string) $query;
+  $quoted = array();
+  $connection = Database::getConnection();
+  foreach ((array) $query->arguments() as $key => $val) {
+    $quoted[$key] = $connection->quote($val);
+  }
+  $sql = strtr($sql, $quoted);
+  if ($return) {
+    return $sql;
+  }
+  dpm($sql, $name);
+  return ($return ? NULL : $query);
+}
+
+/** triage_percent_pov
+ * Function to return percent of poverty level from POV table acquired from
+ * statesidelegal.org thru cron. Function also sets session variable for POV
+ * and session variable for eligibility gotten from triage eligibility taxonomy
+ * */
+function triage_percent_pov($num = 0, $amt = 0, $bank = 0) {
+  $period = 12;
+  $chkperiod = $_SESSION['triage']['triage_income_period'];
+  switch ($chkperiod) {
+    case "Weekly" :
+      $period = 52;
+      break;
+    case "Bi-Weekly" :
+      $period = 26;
+      break;
+    case "Annual" :
+      $period = 1;
+      break;
+  }
+  $nid = $_SESSION['triage']['triage_page_nid'];
+  $vid = ta_variable_get('triage_income_eligibility', 'triage_income_eligibility', $nid);
+  if ($num == 0) {
+    $num = str_replace(",", "", $_SESSION['triage']['my_house_size']);
+  }
+  if ($amt == 0) {
+    $amt = str_replace(",", "", $_SESSION['triage']['my_house_income']);
+  }
+  if ($bank == 0) {
+    $bank = str_replace(",", "", $_SESSION['triage']['triage_bank_amt']);
+  }
+  if ($num == 0) {
+    return -1;
+  }
+  if ($amt == 0) {
+    //return 0;
+  }
+  $vals = variable_get_value("triage_pov_guides", array());
+  //$pov = $vals[$num] / 12;
+  $pov = $vals[$num] / $period;
+  //watchdog('bds', 'pov: ' . $pov . " num: " . $num . " vals: " . serialize($vals));
+  $ret = floor(($amt * 100) / $pov);
+  $_SESSION['triage']['triage_percent_pov'] = $ret;
+  $sql = "select tid from taxonomy_term_data where vid = :vid";
+  $results = db_query($sql, array(':vid' => $vid));
+  $eligibility = array();
+  foreach ($results as $result) {
+    $floor = 0;
+    $ceiling = 0;
+    $bank_limit = 0;
+    $term = taxonomy_term_load($result->tid);
+    $range = explode(",", $term->field_pov_range['und'][0]['value']);
+    if (isset($range[0])) {
+      $floor = $range[0];
+    }
+    if (isset($range[1])) {
+      $ceiling = $range[1];
+    }
+    if (isset($range[2])) {
+      $bank_limit = $range[2];
+    }
+    if (($floor + $ceiling + $bank_limit) == 0) {
+      continue;
+    }
+    if ($ret >= $floor && $ret <= $ceiling && $bank <= $bank_limit) {
+      $eligibility[] = $result->tid;
+    }
+  }
+  $_SESSION['triage']['triage_eligibility'] = $eligibility;
+  return $ret;
+}
+
+function triage_crumb($tid, $returntid = FALSE, $returnray = FALSE) {
+  $breadcrumb = array();
+  $tax_ray = taxonomy_get_parents_all($tid);
+  //  $reversed = $_SESSION['triage']['my_path'];
+  //  $reversed = array_reverse($reversed, true);
+  foreach ($tax_ray as $ray) {
+    //foreach ($reversed as $key => $value) {
+    //$ray = taxonomy_term_load($key);
+    if (in_array($ray->name, $breadcrumb)) {
+      continue;
+    }
+    if (module_exists('i18n_taxonomy')) { //To not break your site if module is not installed
+      $ray = i18n_taxonomy_localize_terms($ray); // The important part!
+    }
+    if ($returntid) {
+      $breadcrumb[] = $ray->tid;
+    }
+    else {
+      $breadcrumb[] = $ray->name;
+    }
+  }
+  $breadcrumb = array_reverse($breadcrumb);
+  //array_pop($breadcrumb);
+  if ($returntid) {
+    return $breadcrumb[0];
+  }
+  if ($returnray) {
+    return $breadcrumb;
+  }
+  return implode(">>", $breadcrumb);
+}
+
+function triage_url($nid, $whatvalue = 'url', $only_popup = FALSE) {
+
+  global $base_url;
+  $this_base = $base_url;
+  if (variable_get('triage_use_alt_url', FALSE) &&
+    variable_get('triage_alt_base_url', '') > "") {
+    $this_base = variable_get('triage_alt_base_url', '');
+  }
+  $whatvalue = strtolower($whatvalue);
+  $last = '';
+  $libdb = variable_get('triage_libtable', "");
+  $libfld = variable_get('triage_libtid', "");
+  if (!db_table_exists($libdb)) {
+    return "";
+  }
+  $allowtids = array();
+  $triage_default_voc = variable_get('triage_default_voc', "me_triage");
+  $url = $this_base . "/triage/" . $triage_default_voc;
+  if ($only_popup) {
+    if (db_table_exists('field_data_field_triage_use_popup')) {
+      $sql = "select entity_id as tid 
+                from field_data_field_triage_use_popup 
+                where field_triage_use_popup_value = 1";
+      $allowtids = db_query($sql)->fetchCol();
+    }
+  }
+  $sql = "select " . $libfld . " from " . $libdb .
+    " where entity_id = :nid";
+  $newtid = db_query($sql, array(':nid' => $nid))->fetchColumn();
+  $currtids = db_query($sql, array(':nid' => $nid))->fetchCol();
+  $stop = TRUE;
+  $ref_tid = array();
+  $out_tid = 0;
+  $level = 0;
+
+  foreach ($currtids as $tid) {
+    $term = taxonomy_term_load($tid);
+    $cnt = 0;
+    $level = triage_term_depth($term->tid);
+    $fld = variable_get('triage_ref_field', "field_triage_ref_me_triage");
+    if (isset($term->$fld)) {
+      $thisfld = $term->$fld;
+      if (isset($thisfld['und'][0])) {
+        $ref_tid[$cnt]['tid'] = $thisfld['und'][0]['tid'];
+        $ref_tid[$cnt]['level'] = $level;
+        $ref_tid[$cnt]['name'] = $term->name;
+        $cnt++;
+      }
+      if (in_array($term->tid, $allowtids) && $only_popup) {
+        $stop = FALSE;
+      }
+    }
+  }
+  if ($stop) {
+    if (variable_get('triage_use_parents_in_popup', FALSE)) {
+      foreach ($currtids as $tid) {
+        $terms = taxonomy_get_parents_all($tid);
+        foreach ($terms as $term) {
+          $cnt = 0;
+
+          $level = triage_term_depth($term->tid);
+          $fld = variable_get('triage_ref_field', "field_triage_ref_me_triage");
+          if (isset($term->$fld)) {
+            if (in_array($term->tid, $allowtids) && $only_popup) {
+              $thisfld = $term->$fld;
+              if (isset($thisfld['und'][0])) {
+                $ref_tid[$cnt]['tid'] = $thisfld['und'][0]['tid'];
+                $ref_tid[$cnt]['level'] = $level;
+                $ref_tid[$cnt]['name'] = $term->name;
+                $cnt++;
+              }
+              $stop = FALSE;
+            }
+          }
+        }
+      }
+    }
+  }
+  if ($ref_tid) {
+    $out_tid = $ref_tid[0]['tid'];
+    $level = $ref_tid[0]['level'];
+    $last = $ref_tid[0]['name'];
+  }
+  foreach ($ref_tid as $xtid) {
+    if ($xtid['level'] > $level) {
+      $level = $xtid['level'];
+      $out_tid = $xtid['tid'];
+      $last = $xtid['name'];
+    }
+  }
+  if ($stop) {
+    return "";
+  }
+  if ($out_tid) {
+    $url .= "/" . $out_tid;
+  }
+  else {
+    $url = '';
+  }
+  switch ($whatvalue) {
+    case 'url':
+      return $url;
+      break;
+    case 'name':
+      return $last;
+      break;
+    default:
+      return "";
+  }
+}
+
+function triage_popup($nid, &$parent) {
+  global $base_url;
+  $this_base = $base_url;
+  if (variable_get('triage_use_alt_url', FALSE) &&
+    variable_get('triage_alt_base_url', '') > "") {
+    $this_base = variable_get('triage_alt_base_url', '');
+  }
+  $no_show = triage_get_details(TRUE);
+  $triage_use_popup = variable_get('triage_use_popup', FALSE);
+  if (!$triage_use_popup) {
+    $parent = -1;
+    return "";
+  }
+  if ($_SESSION['triage']['triage_hide_popup']) {
+    $parent = -1;
+    return "";
+  }
+  $node = node_load($nid);
+  $thistype = $node->type;
+  $type_vals = variable_get('triage_popup_types', array());
+  $type_opts = array();
+  foreach ($type_vals as $key => $val) {
+    if ($val) {
+      $type_opts[$key] = $key;
+    }
+  }
+  if (!in_array($thistype, $type_opts)) {
+    $parent = -1;
+    return "";
+  }
+  $breadcrumb = '';
+  $last = '';
+  $msg = '';
+  $options = array(
+    'attributes' => array(
+      'class' => array('yes-popbutton'),
+    ),
+  );
+  $poptitle = variable_get('triage_popup_title', "Can we help you?");
+  $basemsg = variable_get('triage_popup_basemsg', "Please click the <em>Yes, I'd like help</em> button below to use our guided help process");
+  if (is_array($basemsg)) {
+    $basemsg = $basemsg['value'];
+  }
+  $triage_default_voc = variable_get('triage_default_voc', "me_triage");
+  $triage_url = $this_base . "/triage/" . $triage_default_voc;
+  $url = triage_url($nid, 'url', TRUE);
+  $last = triage_url($nid, 'name', TRUE);
+  if ($url == "") {
+    $parent = -1;
+    return "";
+  }
+  $_SESSION['triage']['triage_popup_counter']++;
+  if ($_SESSION['triage']['triage_popup_counter'] < 1) {
+    return '';
+  }
+  else {
+    $_SESSION['triage']['triage_popup_counter'] = 0;
+  }
+  if ($parent < 1) {
+    $parent = 1;
+  }
+  $yestext = variable_get('triage_yes_text', "</br>Yes");
+  $gentext = variable_get('triage_gen_text', "I'd Like Help with</br> Something Else");
+  $notext = variable_get('triage_no_text', "No Thanks</br>Don't Ask Again");
+  if (!$no_show) {
+    $thisvid = $_SESSION['triage']['triage_summary_voc'];
+    $tp_node = triage_get_page($thisvid);
+    $_SESSION['triage']['triage_page_nid'] = $tp_node->nid;
+    $msg .= "<div class='triage-answers'>";
+    $msg .= "<h6>You've given us some information</h6>";
+    $msg .= triage_answers('', TRUE);
+    $msg .= "<br/><br/>";
+    $msg .= "<em>Click the box below to change your info as you proceed</em>";
+    $form = drupal_get_form('triage_change_form');
+    $msg .= drupal_render($form);
+    $msg .= "</div>";
+    $msg .= "<div class='triage-pop-wrap'>";
+  }
+  $msg .= "<a id='bdslegalpopupClose'[>x</a>";
+  $msg .= "<h3>" . t($poptitle) . "</h3>";
+  //$msg .= "<h3>" . $parent_tid . "</h3>";  
+  $msg .= "<div class='triage-pop-message'>";
+  if (variable_get('triage_use_popup_taxonomy_language', TRUE) && $url) {
+    $msg .= "<h5>" . t("You seem to be interested in issues around " . $last) . "</h5>";
+  }
+  $msg .= "<p>" . $basemsg . "</p></div>";
+  $msg .= "<div class='triage-pop-buttons'>";
+  $msg .= "<div class='triage-buttons-wrap'>";
+  $msg .= "<a class='yes-popbutton' href='" . $url . "'>" . t($yestext) . "</a>";
+  if (variable_get('triage_use_popup_taxonomy_language', TRUE)) {
+    $msg .= "<a class='gen-popbutton' href='" . $triage_url . "'>" . t($gentext) . "</a>";
+  }
+  $msg .= "<a class='no-popbutton' href='#'>" . t($notext) . "</a>";
+  $msg .= "</div></div></div>";
+  $msg . "</div></div>";
+
+  return $msg;
+}
+
+function triage_no_thanks() {
+  if (!drupal_session_started()) {
+    drupal_session_start();
+  }
+  $_SESSION['triage']['triage_hide_popup'] = 1;
+}
+
+function triage_group_text($gid) {
+  $out = db_query("select extra from triage_actions 
+                        where bundle='node'
+                        and type = 'group'
+                        and id = :id", array(":id" => $gid))->fetchColumn();
+  if (empty($out)) {
+    $out = db_query("select title from triage_actions 
+                        where bundle='node'
+                        and type = 'group'
+                        and id = :id", array(":id" => $gid))->fetchColumn();
+    $out = str_ireplace("wrapper", "", $out);
+    $out = str_ireplace("group", "", $out);
+  }
+  return $out;
+}
+
+function triage_state_name($statecode) {
+  if (is_null($statecode || trim(statecode) == '')) {
+    return '';
+  }
+  $options = array(
+    ' ' => '-None-',
+    'AL' => 'Alabama',
+    'AK' => 'Alaska',
+    'AZ' => 'Arizona',
+    'AR' => 'Arkansas',
+    'CA' => 'California',
+    'CO' => 'Colorado',
+    'CT' => 'Connecticut',
+    'DE' => 'Delaware',
+    'DC' => 'District Of Columbia',
+    'FL' => 'Florida',
+    'GA' => 'Georgia',
+    'HI' => 'Hawaii',
+    'ID' => 'Idaho',
+    'IL' => 'Illinois',
+    'IN' => 'Indiana',
+    'IA' => 'Iowa',
+    'KS' => 'Kansas',
+    'KY' => 'Kentucky',
+    'LA' => 'Louisiana',
+    'ME' => 'Maine',
+    'MD' => 'Maryland',
+    'MA' => 'Massachusetts',
+    'MI' => 'Michigan',
+    'MN' => 'Minnesota',
+    'MS' => 'Mississippi',
+    'MO' => 'Missouri',
+    'MT' => 'Montana',
+    'NE' => 'Nebraska',
+    'NV' => 'Nevada',
+    'NH' => 'New Hampshire',
+    'NJ' => 'New Jersey',
+    'NM' => 'New Mexico',
+    'NY' => 'New York',
+    'NC' => 'North Carolina',
+    'ND' => 'North Dakota',
+    'OH' => 'Ohio',
+    'OK' => 'Oklahoma',
+    'OR' => 'Oregon',
+    'PA' => 'Pennsylvania',
+    'RI' => 'Rhode Island',
+    'SC' => 'South Carolina',
+    'SD' => 'South Dakota',
+    'TN' => 'Tennessee',
+    'TX' => 'Texas',
+    'UT' => 'Utah',
+    'VT' => 'Vermont',
+    'VA' => 'Virginia',
+    'WA' => 'Washington',
+    'WV' => 'West Virginia',
+    'WI' => 'Wisconsin',
+    'WY' => 'Wyoming',
+  );
+  return $options[$statecode];
+}
+
+function triage_get_page($vid = NULL) {
+  global $language;
+  $lang = $language->language;
+  if (is_null($vid)) {
+    return NULL;
+  }
+  $sql = "select nid, value
+              from ta_variable
+              where name = 'triage_vocabulary'
+              and nid > 0";
+  $vals = db_query($sql)->fetchAll();
+  $nid = 0;
+  foreach ($vals as $val) {
+    if (unserialize($val->value) == $vid) {
+      $nid = $val->nid;
+      break;
+    }
+  }
+  $_SESSION['triage']['triage_page_nid'] = $nid;
+  $base_node = node_load($nid);
+  $translations = translation_node_get_translations($base_node->tnid);
+  $tnode = (isset($translations[$lang]) ? node_load($translations[$lang]->nid) : $base_node);
+  return $tnode;
+}
+
+function triage_page_field_value($node = NULL, $field = NULL, $default = FALSE) {
+  if (is_null($node) || is_null($field)) {
+    return $default;
+  }
+  $fieldinfo = field_get_items('node', $node, $field);
+  $out = $fieldinfo[0]['value'];
+  if (strlen($out) == 0) {
+    $out = $default;
+  }
+  return $out;
+}
+
+function ta_variable_get($name = NULL, $default = NULL, $nid = 0) {
+  global $ta_conf;
+  if (is_null($name) || is_null($default)) {
+    return '';
+  }
+  return isset($ta_conf[$nid][$name]) ? $ta_conf[$nid][$name] : $default;
+}
+
+function ta_variable_set($name, $value, $nid = 0) {
+  global $ta_conf;
+  $find = db_query('select name from ta_variable where name = :name and nid = :nid', array(
+    ':name' => $name,
+    ':nid' => $nid,
+  ))->fetchCol();
+  if ($find) {
+    db_query('update ta_variable set value = :value where name = :name and nid = :nid', array(
+      ':value' => serialize($value),
+      ':name' => $name,
+      ':nid' => $nid,
+    ));
+  }
+  else {
+    db_insert('ta_variable')
+      ->fields(array(
+        'nid' => $nid,
+        'name' => $name,
+        'value' => serialize($value),
+      ))
+      ->execute();
+  }
+  $ta_conf[$nid][$name] = $value;
+}
+
+function triage_set_variables() {
+  $GLOBALS['ta_conf'] = array();
+  $nids = db_query('select distinct nid from ta_variable where nid > -1');
+  foreach ($nids as $nid) {
+    $GLOBALS['ta_conf'][$nid->nid] = array();
+    $vals = db_query('select name,value from ta_variable where nid = :nid', array(':nid' => $nid->nid));
+    foreach ($vals as $val) {
+      $GLOBALS['ta_conf'][$nid->nid][$val->name] = unserialize($val->value);
+    }
+  }
+}
+
+function triage_is_serialized($data) {
+  // if it isn't a string, it isn't serialized
+  if (!is_string($data)) {
+    return FALSE;
+  }
+  $data = trim($data);
+  if ('N;' == $data) {
+    return TRUE;
+  }
+  if (!preg_match('/^([adObis]):/', $data, $badions)) {
+    return FALSE;
+  }
+  switch ($badions[1]) {
+    case 'a' :
+    case 'O' :
+    case 's' :
+      if (preg_match("/^{$badions[1]}:[0-9]+:.*[;}]\$/s", $data)) {
+        return TRUE;
+      }
+      break;
+    case 'b' :
+    case 'i' :
+    case 'd' :
+      if (preg_match("/^{$badions[1]}:[0-9.E-]+;\$/", $data)) {
+        return TRUE;
+      }
+      break;
+  }
+  return FALSE;
+}
+
+function triage_restart() {
+  $nid = $_SESSION['triage']['triage_page_nid'];
+  $start_text = t(ta_variable_get('triage_restart_text', 'Start Again', $nid));
+  $output = "<div class='triage-restart noprint'>" . t($start_text) . "</div>";
+  return $output;
+}
+
+function triage_get_steps($vid) {
+  $tp_node = triage_get_page($vid);
+  $nid = $tp_node->nid;
+  $grp_array = db_query("select id from triage_actions 
+                      where bundle='node'
+                      and type = 'group'
+                      and entity_id = :entity_id
+                      order by weight", array(':entity_id' => $nid))->fetchAssoc();
+  $group_num = count($grp_array);
+}
+
+function triage_webform_select_options_info() {
+  $items = array();
+  $items['triage_legal_proglems'] = array(
+    'title' => t('Triage Legal Problems'),
+    'options callback' => 'triage_legal_problem',
+  );
+  return $items;
+}
+
+function triage_legal_problem() {
+  $nid = $_SESSION['triage']['triage_page_nid'];
+  $options = array();
+  $vid = ta_variable_get('triage_vocabulary', '', $node->nid);
+  $sql = "SELECT td.tid, td.name from taxonomy_term_data as td INNER JOIN taxonomy_term_hierarchy as th ON td.tid = th.tid where td.vid = :vid and th.parent = :parent";
+  $results = db_query($sql, array(':vid' => $vid, ':parent' => 0));
+  $x = 0;
+  foreach ($results as $row) {
+    $x++;
+    $tid = $row->tid;
+    $name = $row->name;
+    $options[$tid] = $name;
+  }
+  return $options;
+}
+
+function triage_get_children_all($tid) {
+  $c = taxonomy_get_children($tid);
+  $result = array();
+  foreach ($c as $t => $d) {
+    $result[$t] = $d;
+    $below = triage_get_children_all($t);
+    if (!empty($below)) {
+      foreach ($below as $nt => $nd) {
+        $result[$nt] = $nd;
+      }
+    }
+  }
+  return $result;
+}
+
+function triage_block_info() {
+  $blocks['triage_menu_block'] = array(
+    'info' => t('Triage Menu Block'),
+    //The name that will appear in the block list.
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  return $blocks;
+}
+
+function triage_block_view($delta = '') {
+  global $user;
+  global $base_path;
+  global $base_url;
+  $block = "";
+  $m1 = $base_url . '/triage_actions_admin';
+  $m2 = $base_url . '/triage_actions_reuse_editor';
+  $m6 = $base_url . '/admin/reports/triage_summary';
+  $m7 = $base_url . '/admin/config/system/triage';
+  $m8 = 'http://bdsworks.org/triage-text-doc';
+  $instances = '';
+  $triage_nids = db_query('select distinct nid from ta_variable')->fetchCol();
+  foreach ($triage_nids as $nid) {
+    $vid = ta_variable_get('triage_vocabulary', '', $nid);
+    $voc = taxonomy_vocabulary_load($vid);
+    $instances .= "<li class='collapsed'><a href='#'>" . $voc->name . "</a><ul>";
+    $ref = '/admin/structure/taxonomy_manager/voc/' . $voc->machine_name;
+    $name = "Manage " . $voc->name . " Tree";
+    $instances .= "<li><a href='" . $ref . "'>" . $name . "</a></li>";
+    $ref = "/triage/" . $voc->machine_name;
+    $name = "Run " . $voc->name;
+    $instances .= "<li><a href='" . $ref . "'>" . $name . "</a></li>";
+    $ref = "/node/" . $nid . "/edit";
+    $node = node_load($nid);
+    $name = 'Edit ' . $node->title . ' Page';
+    $instances .= "<li><a href='" . $ref . "'>" . $name . "</a></li>";
+    //      if ($voc->machine_name == 'me_triage'){
+    //        $id = '00c7aa59-a0d7-4885-a1a7-48de8d284188';
+    //        $tid = db_query('select tid from taxonomy_term_data where uuid = :id',array(':id'=>$id))->fetchColumn();
+    //        $m5 = $base_url . '/triage_actions_process/' . $tid . "/1";
+    //        $instances .= "<li><a href='" . $m5 . "'>Endpoint Example</a></li>";
+    //      }
+    $instances .= "</ul></li>";
+  }
+  $ctext = "<ul class='triage-choices'>
+                <li class='collapsed'><a href='#'>Specific Triage Instances</a><ul>" . $instances . "</ul></li>
+                <li><a href='" . $m1 . "'>Triage Action Management</a></li>
+                <li><a href='" . $m2 . "'>Action Text Editor</a></li>
+                <li><a href='" . $m6 . "'>Triage Summary Report</a></li>
+                <li><a href='" . $m7 . "'>Overall Triage Configuration</a></li>
+                <li><a href='" . $m8 . "'>Triage Documentation</a></li>
+            </ul>";
+  switch ($delta) {
+
+    case 'triage_menu_block':
+      $block['subject'] = 'Triage Menu';
+      $block['content'] = $ctext;
+      break;
+  }
+  return $block;
+}
+
+function triage_get_details($no_nid = FALSE) {
+  $bds = '';
+  if (!$no_nid) {
+    if (isset($_SESSION['triage']['triage_direct_nid']) && $_SESSION['triage']['triage_direct_nid'] > 0) {
+      //$_SESSION['triage']['triage_direct_nid'] = 0;
+      return FALSE;
+    }
+  }
+  $test = array();
+  //$test[] = $_SESSION['triage']['triage_in_service_area'];
+  if (triage_is_form_used('triage_zip_form') || triage_is_form_used('triage_location_form')) {
+    $test[] = $_SESSION['triage']['my_county'];
+  }
+  if (triage_is_form_used('triage_pov_form') || triage_is_form_used('triage_income_form')) {
+    $test[] = $_SESSION['triage']['my_house_size'];
+    $test[] = $_SESSION['triage']['my_house_income'];
+  }
+  $goon = FALSE;
+  foreach ($test as $t) {
+    if (!isset($t) || is_null($t) || $t == '') {
+      $goon = TRUE;
+      break;
+    }
+  }
+  $test[] = $goon;
+  return $goon;
+}
+
+function triage_num_steps($nid) {
+  $grp_array = db_query("select id from triage_actions 
+                        where bundle='node'
+                        and type = 'group'
+                        and entity_id = :entity_id
+                        order by weight", array(':entity_id' => $nid))->fetchCol();
+  $group_text = array();
+  $steps = array();
+  foreach ($grp_array as $grp) {
+    $group_text[$grp] = triage_group_text($grp);
+    $steps[] = $grp;
+  }
+  $steps[] = 0;
+  $num = count($steps);
+  if (ta_variable_get('triage_progress_extra_step', FALSE, $nid)) {
+    $num++;
+  }
+  return $num;
+}
+
+function triage_term_depth($tid) {
+  $parent = db_query("SELECT parent FROM taxonomy_term_hierarchy WHERE tid = :tid", array(':tid' => $tid))->fetchField();
+  if ($parent == 0) {
+    return 1;
+  }
+  else {
+    return 1 + triage_term_depth($parent);
+  }
+}
+
+function dpq_triage($query, $return = FALSE, $name = NULL) {
+  $query->preExecute();
+  $sql = (string) $query;
+  $quoted = array();
+  $connection = Database::getConnection();
+  foreach ((array) $query->arguments() as $key => $val) {
+    $quoted[$key] = $connection->quote($val);
+  }
+  $sql = strtr($sql, $quoted);
+  if ($return) {
+    return $sql;
+  }
+  dpm($sql, $name);
+  return ($return ? NULL : $query);
+}
+
+function triage_get_aggregate() {
+  $factors = $_SESSION['triage']['factors'];
+  $kind_of_help = $_SESSION['triage']['triage_kind_of_help'];
+  $aggregate = 0;
+  foreach ($factors as $tid) {
+    $term = taxonomy_term_load($tid);
+    //watchdog('bds',serialize($term->field_aggregate_value['und'][0]['value']));
+    $val = $term->field_aggregate_value['und'][0]['value'];
+    $aggregate += $val;
+  }
+  if ($kind_of_help) {
+    $term = taxonomy_term_load($kind_of_help);
+    $val = $term->field_aggregate_value['und'][0]['value'];
+    $aggregate += $val;
+  }
+  return $aggregate;
+}
+
+function triage_tax_list($vals = NULL) {
+  $text = '';
+  if (count($vals) > 0) {
+    if (implode(",", $vals) == '') {
+
+    }
+    else {
+      $sql = 'select name from taxonomy_term_data 
+                  where tid in (' . implode(",", $vals) . ')';
+      $facs = db_query($sql)->fetchCol();
+      foreach ($facs as $fac) {
+        $text .= $fac . "\n";
+      }
+    }
+  }
+  return $text;
+}
+
+function triage_get_parents_all($tid) {
+  $cache = &drupal_static(__FUNCTION__, array());
+
+  if (isset($cache[$tid])) {
+    return $cache[$tid];
+  }
+
+  $parents = array();
+  if ($term = taxonomy_term_load($tid)) {
+    $parents[] = $term;
+    $n = 0;
+    while ($parent = taxonomy_get_parents($parents[$n]->tid)) {
+      $parents = array_merge($parents, $parent);
+      $n++;
+    }
+  }
+
+  $cache[$tid] = $parents;
+
+  return $parents;
+}

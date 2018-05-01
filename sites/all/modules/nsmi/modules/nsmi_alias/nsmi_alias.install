@@ -1,0 +1,11 @@
+<?php
+
+function nsmi_alias_uninstall() {
+  variable_del('nsmi_alias_top');
+  variable_del('nsmi_alias_top_use');
+
+  db_query("DELETE FROM {url_alias} WHERE src = 'dir'");
+  db_query("DELETE FROM {url_alias} WHERE src LIKE 'dir/%%'");
+  
+  db_query("DELETE FROM {cache} WHERE cid LIKE 'nsmi_children_tid_%%'");
+}

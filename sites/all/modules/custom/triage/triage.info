@@ -1,0 +1,28 @@
+;$Id$
+name = triage
+description = Adds triage functionality, based on taxonomy, to Legal Services sites
+package = Triage
+core = 7.x
+dependencies[] = term_reference_tree
+dependencies[] = htmLawed
+dependencies[] = ctools
+dependencies[] = i18n
+dependencies[] = features
+dependencies[] = uuid
+dependencies[] = uuid_features
+dependencies[] = taxonomy_manager
+dependencies[] = variable
+dependencies[] = i18n_node
+dependencies[] = date
+dependencies[] = date_popup
+
+scripts[] = js/jquery.cookie.js
+scripts[] = js/triage.js
+scripts[] = js/jquery-confirm.min.js
+stylesheets[all][] = triage.css
+stylesheets[all][] = js/jquery-confirm.min.css
+files[] = triage.module
+files[] = triage.forms.inc
+files[] = triage.admin.inc
+files[] = triage.css
+version = "7.x-1.0"

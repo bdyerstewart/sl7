@@ -1,0 +1,62 @@
+<?php
+
+/**
+ * 	Implementation of hook_install().
+ */
+function ncd_client_install() {
+	drupal_install_schema('ncd_client');
+	
+	$role = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'sharelaw-userrole'));
+	if (!$role) {
+		db_query("INSERT INTO {role} (name) VALUES('%s')", 'sharelaw-userrole');
+	}
+	$rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'sharelaw-userrole'));
+	
+	$user_exists = db_result(db_query("SELECT uid FROM {users} WHERE name = '%s'", 'sharelaw-user'));
+	if (!$user_exists) {
+		$server = strtolower($_SERVER["SERVER_NAME"]);
+		$email = 'sharelaw-user@' . $server;
+		$pass = md5('U6){rj<+@%;523~M$e(:1');
+		db_query("INSERT INTO {users} (name, pass, mail, status, created, init) VALUES('%s', '%s', '%s', 1, UNIX_TIMESTAMP(), '%s')", 'sharelaw-user', $pass, $email, $email);
+		$uid = db_result(db_query("SELECT uid FROM {users} WHERE name = '%s'", 'sharelaw-user'));
+		db_query("INSERT INTO {users_roles} (uid, rid) VALUES(%d, %d)", $uid, $rid);
+		db_query("INSERT INTO {tokenauth_tokens} (uid, token) VALUES(%d, '%s')", $uid, 'safdsdfgsdfgsfdgfdghdghd');
+	}
+}
+
+/**
+ * 	Implementation of hook_uninstall().
+ */
+function ncd_client_uninstall() {
+	drupal_uninstall_schema('ncd_client');
+	$rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", 'sharelaw-userrole'));
+	$uid = db_result(db_query("SELECT uid FROM {users} WHERE name = '%s'", 'sharelaw-user'));
+	db_query("DELETE FROM {role} WHERE rid = %d", $rid);
+	db_query("DELETE FROM {users_roles} WHERE rid = %d AND uid = %d", $rid, $uid);
+	db_query("DELETE FROM {users} WHERE uid = %d", $uid);
+	db_query("DELETE FROM {tokenauth_tokens} WHERE uid = %d", $uid);
+}
+
+/**
+ * 	Implementation of hook_schema().
+ */
+function ncd_client_schema() {
+	$schema['ncd_shared_nodes'] = array(
+		'description' => t('Store NCD shared content'),
+		'fields' => array(
+			'nid' => array(
+				'type' => 'serial',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+				'description' => t(''),
+			),
+		),    
+		'unique keys' => array(
+			'nid' => array('nid')
+		),
+		'primary key' => array('nid'),
+	);
+	return $schema;
+}
+
+?>

@@ -1,0 +1,8 @@
+;$Id$
+name = Stateside Search
+description = Stateside Legal Custom Search Module.
+package = Other
+core = 7.x
+files[] = statesidesearch.module
+stylesheets[all][] = statesidesearch.css
+scripts[] = statesidesearch.js

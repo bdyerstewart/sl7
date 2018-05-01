@@ -1,0 +1,94 @@
+<?php
+
+/**
+ * Implements hook_menu_breadcrumb_alter().
+ */
+function og_menu_trail_breadcrumbs_menu_breadcrumb_alter(&$active_trail, $item) {
+  // We need to figure out if this is a group content.
+  if(isset($item['page_arguments'][0])) {
+    $node = $item['page_arguments'][0];
+    // If so we'll combine the og_menu trail with the main menu trail.
+    if(is_object($node) && og_is_group_content_type('node', $node->type)) {
+      $group_id = og_get_entity_groups('node', $node);
+      if(isset($group_id['node'])) {
+        // Get the menu and figure out a trail.
+        $links = og_menu_trail_breadcrumbs_get_tree($node);
+        if($links) {
+          // Flatten into a 1 dimension array for easier working.
+          $links = og_menu_trail_breadcrumbs_flatten_tree($links);
+          // Overwrite the $active trail with the new items.
+          $new_trail = array();
+          // If the first trail is the "home" item, grab it for our new version.
+          if(stripos($active_trail[0]['title'], 'home') === 0) {
+            $new_trail[] = $active_trail[0];
+          }
+          $active_trail = array_merge($new_trail, $links);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Flattens the tiered menu links into a 1 dimension array.
+ *
+ * @param array $links_tiered A tiered series of links to be flattened by evaluating the "child" element of each array.
+ * @return array
+ */
+function  og_menu_trail_breadcrumbs_flatten_tree($links_tiered) {
+  $links = array();
+  $links[] = $links_tiered;
+  if(isset($links_tiered['child'])) {
+    unset($links[count($links) - 1]['child']);
+    $links = array_merge($links, og_menu_trail_breadcrumbs_flatten_tree($links_tiered['child']));
+  }
+
+  return $links;
+}
+
+/**
+ * Gets the menu item for the provided node, builds a tree walking up the associations
+ * factoring in OG Menu and potentially a groups menu.
+ *
+ * @param object $node
+ * @param array|null $starting_link
+ * @param array|null $child_link
+ * @return array|null
+ */
+function og_menu_trail_breadcrumbs_get_tree($node, $starting_link = null, $child_link = null) {
+  $link = array();
+  if(!$starting_link) {
+    if(!empty($node->menu_node_links)) {
+      $link = reset($node->menu_node_links);
+      $link = menu_link_load($link->mlid);
+    }
+  }
+  else {
+    $link = $starting_link;
+  }
+
+  if($child_link) {
+    $link['child'] = $child_link;
+  }
+
+  // If there is a parent, walk up it.
+  if(!empty($link['plid'])) {
+    $parent_link = menu_link_load($link['plid']);
+    $parent_link['child'] = $link;
+    // Use recursion to walk up the tree of parents.
+    return og_menu_trail_breadcrumbs_get_tree($node, $parent_link, $link);
+  }
+  else {
+    // Is this OG content? do we need to get it's OG Menu?
+    $group_id = og_get_entity_groups('node', $node);
+    if(isset($group_id['node'])) {
+      $group_id = $group_id['node'];
+      $group_id = reset($group_id);
+      $group = node_load($group_id);
+      return og_menu_trail_breadcrumbs_get_tree($group, null, $link);
+    }
+  }
+
+  return $link;
+
+}

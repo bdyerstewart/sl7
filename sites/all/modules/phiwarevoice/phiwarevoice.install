@@ -1,0 +1,37 @@
+<?php
+
+/**
+ * @file
+ * Installation file for Phiware Voice module.
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function phiwarevoice_requirements($phase) {
+  $requirements = array();
+  if ($phase == 'runtime') {
+    // Raise warning if Customer ID has not been set yet.
+    if (!is_string(variable_get('phiwarevoice_customerid', '')) || drupal_strlen(variable_get('phiwarevoice_customerid', ''))<1) {
+      $requirements['phiwarevoice'] = array(
+        'title' => t('Phiware Voice module'),
+        'description' => t('Phiware Voice module has not been configured yet. Please configure its settings from the <a href="@url">Phiware Voice settings page</a>.', array('@url' => url('admin/settings/phiwarevoice'))),
+        'severity' => REQUIREMENT_ERROR,
+        'value' => t('Not configured'),
+      );
+    }
+  }
+  return $requirements;
+}
+
+/**
+ * Implements hook_install().
+ */
+function phiwarevoice_install() {
+  variable_set('phiwarevoice_customerid', '');
+  variable_set('phiwarevoice_type', 'link');
+  variable_set('phiwarevoice_begin_weight', '-100');
+  variable_set('phiwarevoice_end_weight', '100');
+}
+
+

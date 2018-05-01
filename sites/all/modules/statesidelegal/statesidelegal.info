@@ -1,0 +1,12 @@
+;$Id$
+name = StatesideLegal
+description = Miscellaneous functions for Stateside Legal
+package = Other
+core = 7.x
+scripts[] = statesidelegal.js
+stylesheets[all][] = statesidelegal.css
+files[] = statesidelegal.module
+files[] = statesidelegal.blocks.inc
+files[] = statesidelegal.forms.inc
+files[] = statesidelegal.admin.inc
+files[] = statesidelegal.extra.inc

@@ -1,0 +1,996 @@
+var is_changed = false;
+var nokids = 0;
+var popupStatus = 0;
+var alreadyclicked=false;
+var zitem = '';
+var newtriage = true;
+var reason = '';
+var control = '';
+var waiting = "false";
+var triage_chart = '';
+(function ($) {
+  Drupal.behaviors.triage = {
+    attach: function (context, settings) {
+      var triage_path = window.location.protocol + "//" + window.location.host;
+      var exist= jQuery('#triage-popup').length;
+      adjust_nav_css();
+      if(typeof Drupal.settings.my_progress_bar !== 'undefined'){
+        if (Drupal.settings.my_progress_bar.restart){
+          triage_progress(0);
+          Drupal.settings.my_progress_bar.restart = false;
+        }
+      }
+      if ($('body.page-triage').length > 0){
+        if (Drupal.settings.triage_item > 0){
+          tid = Drupal.settings.triage_item;
+          Drupal.settings.triage_item = 0;
+          var triage_path = window.location.protocol + "//" + window.location.host ;
+          var lang = Drupal.settings.my_triage.lang;
+          var defa_lang = Drupal.settings.my_triage.default_lang;
+          if(lang==defa_lang){lang = '';}
+          else {lang = lang + "/";}
+          triage_path = triage_path + Drupal.settings.basePath + lang + "triage/" + Drupal.settings.my_triage.vocab + "/";
+          var len = Drupal.settings.my_triage.tid.length;
+          Drupal.settings.my_triage.tid[len] = tid;
+          var url = triage_path + tid + "/1/-1";
+          triage_getdata(url,tid);
+          //set opening values
+          if (newtriage){
+            $.cookie('triage_completed', 0,{ path: '/' });
+            $.cookie('triage_hist', '',{ path: '/' });
+            $.cookie('triage_current_step', 1,{ path: '/' });
+            $.cookie('triage_last','',{ path: '/' });
+            $.cookie('waiting', "false", { path: '/' });
+            newtriage = false;
+          }          
+        }
+        if (Drupal.settings.my_alt_display.use_alt){
+          $('#triage-page-wrapper').remove();
+          var home_block = Drupal.settings.my_alt_display.home_block;
+          var hold = $(home_block).html();
+          hold = "<div id='triage-page-wrapper'>" + hold + "</div>";
+          $('body.page-triage').html(hold);
+          $('body.page-triage').css('background-image','none');
+          var cmds = Drupal.settings.my_alt_display.alt_cmds;
+          if (cmds > ''){
+            eval(cmds);
+          }
+        }
+      }
+      if(exist == 0) {
+        $("body").append("<div id='triage-popup'></div>");
+      }
+      var exist= jQuery('#bdslegalpopup').length;
+      if(exist == 0) {
+        $("body").append("<div id='bdslegalpopup'></div>");
+      }
+      if (typeof Drupal.settings.triage_popup != 'undefined'){
+        if(Drupal.settings.triage_popup.parent>0){
+          $('#bdslegalpopup').html(Drupal.settings.triage_popup.msg);
+          bdslegalcenterPopup('bdslegalpopup');
+          //window.setTimeout( bdslegalloadPopup('bdslegalpopup'),7000);
+          bdslegalloadPopup('bdslegalpopup');
+          popupStatus = 1;
+        }
+      }
+      $('#block-triage-triage-menu-block li').click(function(){
+        if($(this).hasClass('collapsed')){
+            $(this).addClass('expanded');
+            $(this).removeClass('collapsed');
+        }  
+        else{
+            if($(this).hasClass('expanded')){
+                $(this).removeClass('expanded');
+                $(this).addClass('collapsed');    
+            }
+        }
+      });
+      
+      var selector = 'form input.triage-input';
+      $(selector).each(function( index ) {
+          var slct = $(this);
+          if(slct.attr('type')=='checkbox'){
+            var newval = slct.attr('checked');
+            if (typeof slct.data('last') == "undefined"){
+              slct.data('last', newval);
+            }
+          }
+          else{
+            if (typeof slct.data('last') == "undefined"){
+              slct.data("last",slct.val());
+            }
+          }
+      });
+      $('.page-triage-actions-process #breadcrumbs').html("<a href='"+triage_path+Drupal.settings.basePath+"'>Home</a>");
+      $('#block-system-main').show();   
+      $('.triage-forms .triage-top-form').last().css('border','none');
+      $('.triage-restart').live('touchstart click', function(e){
+          var el=$(this);
+          if (alreadyclicked){
+              alreadyclicked=false; // reset
+              clearTimeout(alreadyclickedTimeout); // prevent this from happening
+              // do what needs to happen on double click. 
+                triage_restart();
+          }
+          else{
+              alreadyclicked=true;
+              alreadyclickedTimeout=setTimeout(function(){
+                alreadyclicked=false; // reset when it happens
+                  // do what needs to happen on single click. 
+                  // use el instead of $(this) because $(this) is 
+                  // no longer the element
+                triage_restart();
+              },300); // <-- dblclick tolerance here
+          }
+          return false;
+      });
+      function triage_restart(){
+          var lang = Drupal.settings.my_triage.lang;
+          var defa_lang = Drupal.settings.my_triage.default_lang;
+          if(lang==defa_lang){lang = '';}
+          else {lang = lang + "/";}
+          var triage_path = window.location.protocol + "//" + window.location.host;
+          var url = triage_path + Drupal.settings.basePath + lang + "triage/" + Drupal.settings.my_triage.vocab + "/0/1/-1";
+          triage_getdata(url,0);
+          triage_progress(0);
+      }
+      $('.triage-row').live('touchstart click', function(e){
+          var el=$(this);
+          if (alreadyclicked){
+              alreadyclicked=false; // reset
+              clearTimeout(alreadyclickedTimeout); // prevent this from happening
+              // do what needs to happen on double click. 
+                triage_moveon($(el));
+          }
+          else{
+              alreadyclicked=true;
+              alreadyclickedTimeout=setTimeout(function(){
+                alreadyclicked=false; // reset when it happens
+                  // do what needs to happen on single click. 
+                  // use el instead of $(this) because $(this) is 
+                  // no longer the element
+                triage_moveon($(el));
+              },300); // <-- dblclick tolerance here
+          }
+          return false;
+      });
+      $(".triage-reset").live('touchstart click', function(e){
+        var el=$(this);
+        if (alreadyclicked){
+            alreadyclicked=false;
+            clearTimeout(alreadyclickedTimeout);
+              triage_reset($(el));
+        }
+        else{
+            alreadyclicked=true;
+            alreadyclickedTimeout=setTimeout(function(){
+              alreadyclicked=false;
+              triage_reset($(el));
+            },300);
+        }
+        return false;
+      });
+      $(".triage-submit").live('touchstart click', function(e){
+        var el=$(this);
+        //alert(el);
+        if (alreadyclicked){
+            alreadyclicked=false;
+            clearTimeout(alreadyclickedTimeout);
+              triage_submit($(el));
+        }
+        else{
+            alreadyclicked=true;
+            alreadyclickedTimeout=setTimeout(function(){
+              alreadyclicked=false;
+              triage_submit($(el));
+            },300);
+        }
+        return false;
+      });                
+      $(".triage-group-submit").live('touchstart click', function(e){
+        e.stopPropagation();e.preventDefault();
+        var el=$(this);
+        if (alreadyclicked){
+            alreadyclicked=false;
+            clearTimeout(alreadyclickedTimeout);
+              triage_grpmove($(el));
+        }
+        else{
+            alreadyclicked=true;
+            alreadyclickedTimeout=setTimeout(function(){
+              alreadyclicked=false;
+              triage_grpmove($(el));
+            },300);
+        }
+        return false;
+      });                
+      $(".triage-group-reset").live('touchstart click', function(e){
+        var el=$(this);
+        if (alreadyclicked){
+            alreadyclicked=false;
+            clearTimeout(alreadyclickedTimeout);
+              triage_grpreset($(el));
+        }
+        else{
+            alreadyclicked=true;
+            alreadyclickedTimeout=setTimeout(function(){
+              alreadyclicked=false;
+              triage_grpreset($(el));
+            },300);
+        }
+        return false;
+      });             
+      $('#triage-zip-form').submit(function( event ) {
+         event.preventDefault();
+         item = $( event.target ).parents('.triage-group').find('.triage-group-submit');
+         triage_grpmove(item)
+      });
+      $('#triage-in-service-area-form').submit(function( event ) {
+         event.preventDefault();
+         item = $( event.target ).parents('.triage-group').find('.triage-group-submit');
+         triage_grpmove(item)
+      });
+      function triage_grpmove(item){
+        var proc_path = window.location.protocol + "//" + window.location.host + Drupal.settings.basePath;
+        var post_url = proc_path + 'triage-post';
+        var keepgoing = true;
+        var data = {};
+        var rows = [];
+        data.rows = rows;
+        var frm = item.parent().parent().find('form');
+        item.parent().parent().find('form').each(function( index ) {
+          var formname = $( this ).attr('id');
+          var classes = $( this ).parent('.triage-action-form').attr('class');
+          //alert(classes);
+          if (classes.indexOf('mandatory')>-1){
+            switch (formname) {
+              case 'triage-pov-form':
+                if (! triage_income_validate()){
+                  keepgoing = false;
+                  return;
+                }
+                break;
+              case 'triage-bank-form' :
+                if (! triage_bank_validate()){
+                  keepgoing = false;
+                  return;
+                }    
+                break;
+              case 'triage-zip-form' :
+                if (! triage_zip_validate()){
+                  keepgoing = false;
+                  return;
+                }    
+                break;
+              case 'triage-in-service-area-form' :
+                if (! triage_sa_validate()){
+                  keepgoing = false;
+                  return;
+                }    
+                break;
+            }    
+          }
+          var selector = "#" + formname + ' input.triage-input';
+          val = '';
+          inputs = '';
+          $(selector).each(function( index ) {
+            slct = $(this);
+            inputs = inputs + slct.attr('id');
+            if (inputs > ''){inputs = inputs + ","};
+            if(slct.attr('type')=='checkbox' || slct.attr('type')=='radio'){
+              if (slct.attr('checked')){
+                val = val + slct.val();
+                if (val > ''){val = val + ",";}
+              }
+            }
+            else {
+              val = val + slct.val();
+              if (val > ''){val = val + ",";}
+            }
+          });          
+          var row = {
+            form: formname,
+            inputs: inputs,
+            values: val
+          };
+          data.rows.push(row);
+        });
+        if (keepgoing){
+          triage_loading();
+          $.post(post_url,data, function(response,status){
+            if(status=='success'){
+              $('.triage-loading').remove();
+              triage_group_check(item);
+            }
+          });
+        }
+        //console.log(JSON.stringify(data));
+      }
+      function triage_group_check(item){
+        var triage_path = window.location.protocol + "//" + window.location.host;
+        var cookiepath = triage_path + Drupal.settings.basePath;
+        var lang = Drupal.settings.my_triage.lang;
+        var defa_lang = Drupal.settings.my_triage.default_lang;
+        if(lang==defa_lang){lang = '';}
+        else {lang = lang + "/";}
+        triage_path = triage_path + Drupal.settings.basePath + lang + "triage/" + Drupal.settings.my_triage.vocab + "/";
+        nokids = item.hasClass('nokids');
+        if (nokids){item.removeClass('nokids');}
+        var thisclass = item.attr('class');
+        var grpid = thisclass.replace('triage-group-submit next-','');
+        var msg = item.parent().children('.triage-group-reset').attr('class');
+        if( typeof msg == "undefined" ){
+            $.cookie('triage_hist','',{ path: '/' });
+            $.cookie('triage_last','',{ path: '/' });
+            $.cookie('triage_current_step', 1,{ path: '/' });
+        }
+        var pre_cook = $.cookie('triage_hist');
+        if (pre_cook===null){
+        }
+        else {
+          if (grpid != 0){
+            var ref = Drupal.settings.my_group[parseInt(grpid)];
+            $.cookie('triage_hist', pre_cook + ">>" + ref,{ path: '/' });
+            $.cookie('triage_last',ref,{ path: '/' });
+            $.cookie('triage_current_step', 1,{ path: '/' });
+          }
+        }
+        triage_progress(grpid);
+        var url = triage_path +"0/1/" + grpid;
+        parent = item.parent('.triage-group');
+        $('.triage-group').hide();
+        $('.grp-'+grpid).removeClass('hidden');
+        $('.grp-'+grpid).show();
+        if (grpid==0){
+//          alert('yikes');
+//          $('.grp-'+grpid).hide();
+//          url = triage_path +"0/1/-1";
+//          triage_getdata(url,0);
+          url = triage_path +"0";
+          window.location.href = url;
+        }
+        else{
+          //$('.triage-loading').remove();
+        }
+      }
+      function triage_grpreset(item){
+        var triage_path = window.location.protocol + "//" + window.location.host ;
+        var lang = Drupal.settings.my_triage.lang;
+        var defa_lang = Drupal.settings.my_triage.default_lang;
+        if(lang==defa_lang){lang = '';}
+        else {lang = lang + "/";}
+        triage_path = triage_path + Drupal.settings.basePath + lang + "triage/" + Drupal.settings.my_triage.vocab + "/";
+        nokids = item.hasClass('nokids');
+        if (nokids){item.removeClass('nokids');}
+        var thisclass = item.attr('class');
+        var grpid = thisclass.replace('triage-group-reset prev-','');
+        var url = triage_path +"0/1/" + grpid;
+        triage_loading();
+        $('.triage-group').hide();
+        $('.grp-'+grpid).show();     
+        $('.triage-loading').remove();
+        $('.triage-content').html("");
+        triage_progress(grpid);
+      }
+      function triage_submit(){
+        var changed = triage_is_changed();
+        var proc_path = window.location.protocol + "//" + window.location.host + Drupal.settings.basePath;
+        var write_url = proc_path + 'triage_write_history';
+        var lang = Drupal.settings.my_triage.lang;
+        var defa_lang = Drupal.settings.my_triage.default_lang;
+        if(lang==defa_lang){lang = '';}
+        else {lang = lang + "/";}
+        var len = Drupal.settings.my_triage.tid.length;
+        var tid = Drupal.settings.my_triage.tid[len-1];
+        //alert(tid);
+        var url = proc_path + lang + "triage_actions_process/" + tid;
+        $(".triage-loading").remove();
+        $(".triage-content").first().append("<div class='triage-loading'>Loading...</div>");
+        $.cookie('triage_last',tid,{ path: '/' });
+        if (changed==""){
+          $.cookie('triage_completed',1,{ path: '/' });
+          window.location.href = url;
+        }
+        else{
+          is_changed = true;
+          $('#' + changed).change();
+          $(document).ajaxComplete(function(){
+            if (is_changed==true){
+              is_changed = false;
+              $.cookie('triage_completed',1,{ path: '/' });
+              window.location.href = url;
+            }
+          });
+        }
+      };
+      function triage_is_changed( item ){
+        //Sorts through inputs to see if any haven't been updated yet and returns the id
+        //   so that we call change() on submit 
+        item =  item || ".triage-forms";
+        var ret = "";
+        var selector = item + ' input.triage-input';
+        $(selector).each(function( index ) {
+            slct = $(this);
+            //alert(slct.attr('id'));
+            var last = slct.data("last");
+            if(slct.attr('type')=='checkbox' || slct.attr('type')=='radios'){
+              if(last !== slct.attr('checked')){
+                var newval = slct.attr('checked');
+                slct.data('last', newval);
+                ret = slct.attr('id');
+                return ret;
+              }
+            }
+            else {
+                if(slct.val() !== last){
+                  var newval = slct.val();
+                  slct.data('last', newval) ;
+                  ret = slct.attr('id');
+                  return ret;
+                }
+            }
+        });
+        return ret;
+      }
+      function triage_income_validate(){
+        triage_clicks();
+        var msg = '';
+        $('#edit-triage-household').removeClass('alert');
+        $('#edit-triage-income').removeClass('alert');
+        $('div.notice').remove();
+        var ret = true;
+        var size = $('#edit-triage-household').val();
+        msg = isTriageInteger(size,"Household Size");
+        if (msg>""){
+            $('#edit-triage-household').val('');
+            $('#triage-pov-form').prepend('<div class="notice">'+msg+'</div>');
+            $('#edit-triage-household').addClass('alert');
+            return false;
+        }
+        if (size==='0' || size.trim() ===''){
+          if (size==='0'){
+              msg = "Household size must be at least 1";
+              $('#edit-triage-household').addClass('alert');
+              $('#triage-pov-form').prepend('<div class="notice">'+msg+'</div>');
+              return false;
+          }
+          else{
+              msg = "Household size must be entered";
+              $('#edit-triage-household').addClass('alert');
+              $('#triage-pov-form').prepend('<div class="notice">'+msg+'</div>');
+              return false;              
+          }
+        }
+        else {
+          $('#edit-triage-household').removeClass('alert');
+        }
+        var income = $('#edit-triage-income').val();
+        msg = isTriageInteger(income,"Income");
+        if (msg>""){
+            $('#edit-triage-income').val('');
+            $('#triage-pov-form').prepend('<div class="notice">'+msg+'</div>');
+            return false;
+        }
+        if (income === null || income.trim() ===''){
+              msg = "Household income must be entered";
+              $('#edit-triage-income').addClass('alert');
+              $('#triage-pov-form').prepend('<div class="notice">'+msg+'</div>');
+              return false;              
+        }
+        else {
+            $('#edit-triage-income').removeClass('alert');
+        }
+          return true;
+      }
+      function triage_bank_validate(){
+        triage_clicks();
+        $('#edit-triage-bank-amt').removeClass('alert');
+        $('div.notice').remove();
+        var ret = true;
+        var amt = $('#edit-triage-bank-amt').val();
+        if (amt===null || amt==''){
+          ret = false;
+          $('#edit-triage-bank-amt').addClass('alert');
+        }
+        else {
+          $('#edit-triage-bank-amt').removeClass('alert');
+        }
+        if (!ret){
+          $('div.notice').remove();
+          $('#triage-bank-form').prepend('<div class="notice">Values outlined in red are required</div>');
+        }
+        return ret;
+      }
+      function triage_zip_validate(){
+        triage_clicks();
+        $('#edit-triage-zip').removeClass('alert');
+        $('div.notice').remove();
+        var zip = $('#edit-triage-zip').val();
+        var ret = true;
+        if (zip!=='000'){
+          var found = $('#triage-zip-form').find('.city-fail');
+          if (typeof found.attr('class')=='undefined' && zip > ''){
+          }
+          else{
+            ret = false;
+            $('#edit-triage-zip').addClass('alert');
+          }
+        }
+        else {
+          $('#edit-triage-zip').removeClass('alert');
+        }
+        if (!ret){
+          $('div.notice').remove();
+          $('#triage-zip-form').prepend('<div class="notice">Values outlined in red are required</div>');
+        }
+        return ret;
+      }
+      function triage_sa_validate(){
+        triage_clicks();
+        var sa = $("#edit-triage-area input[type='radio']:checked").val();
+        $('#edit-triage-area').removeClass('alert');
+        $('div.notice').remove();
+        var ret = true;
+        if (typeof sa=='undefined'){
+          ret = false;
+          $('#edit-triage-area').addClass('alert');
+        }
+        else {
+          if (sa=='1'){
+            var proc_path = window.location.protocol + "//" + window.location.host + Drupal.settings.basePath;
+            var post_url = proc_path + 'triage-post';
+            var data = {};
+            var rows = [];
+            data.rows = rows;
+            var row = {
+              form: 'triage-in-service-area-form',
+              inputs: '',
+              values: sa
+            };
+            data.rows.push(row);
+            triage_loading();
+            $.post(post_url,data, function(response,status){
+              if(status=='success'){
+                $('.triage-loading').remove();
+              }
+              var url = proc_path + Drupal.settings.sa_url;
+              window.location.href = url;
+            });
+            return false;
+          }
+        }
+        if (!ret){
+          $('div.notice').remove();
+          $('#triage-in-service-area-form').prepend('<div class="notice">Please Select one of the Options</div>');
+        }
+        return ret;
+      }
+      function triage_reset(item){
+        var triage_path = window.location.protocol + "//" + window.location.host ;
+        var lang = Drupal.settings.my_triage.lang;
+        var defa_lang = Drupal.settings.my_triage.default_lang;
+        if(lang==defa_lang){lang = '';}
+        else {lang = lang + "/";}        
+        triage_path = triage_path + Drupal.settings.basePath + lang + "triage/" + Drupal.settings.my_triage.vocab + "/";
+        var len = Drupal.settings.my_triage.tid.length-1;
+        var tid = Drupal.settings.my_triage.tid[len-1];
+        if (tid==0){
+          var url = triage_path + tid + "/1/-1";
+        }
+        else {
+          var url = triage_path + tid + "/1/-1";
+        }
+        Drupal.settings.my_triage.tid.length = len;
+        triage_getdata(url,tid);
+      }
+      function triage_moveon(item){
+        var triage_path = window.location.protocol + "//" + window.location.host ;
+        var lang = Drupal.settings.my_triage.lang;
+        var defa_lang = Drupal.settings.my_triage.default_lang;
+        if(lang==defa_lang){lang = '';}
+        else {lang = lang + "/";}
+        triage_path = triage_path + Drupal.settings.basePath + lang + "triage/" + Drupal.settings.my_triage.vocab + "/";
+        nokids = item.hasClass('nokids');
+        if (nokids){item.removeClass('nokids');}
+        var thisclass = item.attr('class');
+        var tid = thisclass.replace('triage-row trow-','');
+        var len = Drupal.settings.my_triage.tid.length;
+        Drupal.settings.my_triage.tid[len] = tid;
+        var url = triage_path + tid + "/1/-1";
+        triage_getdata(url,tid,nokids);
+      }
+      function triage_clicks(){
+        alreadyclicked=false
+        // unsets click and touchstart functions so that we don't get doubles
+        $('.triage-row').unbind();
+        $('.triage-row').die("touchstart click");
+        $('.triage-row').live('touchstart click', function(e){
+            e.stopPropagation();e.preventDefault();
+            var el=$(this);
+            if (alreadyclicked){
+                alreadyclicked=false; 
+                clearTimeout(alreadyclickedTimeout);
+                triage_moveon($(el));
+            }
+            else{
+                alreadyclicked=true;
+                alreadyclickedTimeout=setTimeout(function(){
+                  alreadyclicked=false; 
+                  triage_moveon($(el));
+                },300); 
+            }
+            return false;
+        });       
+        $('.triage-reset').unbind();
+        $(".triage-reset").die("touchstart click");
+        $(".triage-reset").live('touchstart click', function(e){
+            var el=$(this);
+            if (alreadyclicked){
+                alreadyclicked=false; // reset
+                clearTimeout(alreadyclickedTimeout);
+                  triage_reset($(el));
+            }
+            else{
+                alreadyclicked=true;
+                alreadyclickedTimeout=setTimeout(function(){
+                  alreadyclicked=false;
+                  triage_reset($(el));
+                },300);
+            }
+            return false;
+        });
+        $('.triage-submit').unbind();
+        $(".triage-submit").die("touchstart click");
+        $(".triage-submit").live('touchstart click', function(e){
+            e.stopPropagation();e.preventDefault();
+            triage_submit();
+        });                
+        $('.triage-group-submit').unbind();
+        $(".triage-group-submit").die("touchstart click");
+        $(".triage-group-submit").live('touchstart click', function(e){
+          e.stopPropagation();e.preventDefault();
+          var el=$(this);
+          if (alreadyclicked){
+              alreadyclicked=false;
+              clearTimeout(alreadyclickedTimeout);
+                triage_grpmove($(el));
+          }
+          else{
+              alreadyclicked=true;
+              alreadyclickedTimeout=setTimeout(function(){
+                alreadyclicked=false;
+                triage_grpmove($(el));
+              },300);
+          }
+          return false;
+        });                
+        $('.triage-group-reset').unbind();
+        $(".triage-group-reset").die("touchstart click");
+        $(".triage-group-reset").live('touchstart click', function(e){
+          var el=$(this);
+          if (alreadyclicked){
+              alreadyclicked=false;
+              clearTimeout(alreadyclickedTimeout);
+                triage_grpreset($(el));
+          }
+          else{
+              alreadyclicked=true;
+              alreadyclickedTimeout=setTimeout(function(){
+                alreadyclicked=false;
+                triage_grpreset($(el));
+              },300);
+          }
+          return false;
+        }); 
+        $('.triage-restart').unbind();
+        $(".triage-restart").die("touchstart click");
+        $('.triage-restart').live('touchstart click', function(e){
+            var el=$(this);
+            if (alreadyclicked){
+                alreadyclicked=false; // reset
+                clearTimeout(alreadyclickedTimeout); // prevent this from happening
+                // do what needs to happen on double click. 
+                  triage_restart();
+            }
+            else{
+                alreadyclicked=true;
+                alreadyclickedTimeout=setTimeout(function(){
+                  alreadyclicked=false; // reset when it happens
+                    // do what needs to happen on single click. 
+                    // use el instead of $(this) because $(this) is 
+                    // no longer the element
+                  triage_restart();
+                },300); // <-- dblclick tolerance here
+            }
+            return false;
+        });
+      }
+      function triage_getdata(url, tid, nokids){
+        var out = '';
+        triage_loading();
+        $.getJSON( url, function( data ) {
+          if (data){
+              out = out + data ;
+          }
+          $(".triage-content").html(out);
+          $(".triage-loading").remove();
+          if (nokids){
+            $('.triage-sub-text').remove();
+          }
+          triage_clicks();
+          adjust_nav_css();
+          $(".triage-loading").remove();
+        });
+      }
+      function triage_writedata(url){
+        console.log('in function' + url);
+        var out = '';
+        $.getJSON( url, function( data ) {
+          if (data){
+            console.log('in data');
+          }
+          $(".triage-loading").remove();
+        });
+      }
+      function triage_getpopup(url){
+        var out = '';
+        $.getJSON( url, function( data ) {
+          if (data){
+              out = out + data ;
+          }
+        });
+      }
+      function objToString (obj) {
+          var str = '';
+          for (var p in obj) {
+              if (obj.hasOwnProperty(p)) {
+                  str += p + '::' + obj[p] + '\n';
+              }
+          }
+          return str;
+      }    
+      function adjust_nav_css(){
+          if (typeof Drupal.settings.my_triage !== 'undefined'){
+              $('.ta-nav-bar').css('background-color',Drupal.settings.my_triage.triage_nav_bar_color);
+              var resetcss = Drupal.settings.my_triage.resetcss;
+              var button = $('.triage-group-reset');
+              $.each( resetcss, function( key, value ) {
+                  button.css(key,value);
+              });
+              var button = $('.triage-reset');
+              $.each( resetcss, function( key, value ) {
+                  button.css(key,value);
+              });
+              var submitcss = Drupal.settings.my_triage.submitcss;
+              var button = $('.triage-group-submit');
+              $.each( submitcss, function( key, value ) {
+                  button.css(key,value);
+              });
+              var button = $('.triage-submit');
+              $.each( submitcss, function( key, value ) {
+                  button.css(key,value);
+              });
+              var button = $('.triage-restart');
+              $.each( submitcss, function( key, value ) {
+                  button.css(key,value);
+              });
+          }
+      }
+      function nobread(){
+        var triage_path = window.location.protocol + "//" + window.location.host;
+        $('.page-triage-actions-process #breadcrumbs').html("<a href='"+triage_path+"'Home</a>");
+      }
+      function is_touch_device(){
+        return (('ontouchstart' in window) || (navigator.msMaxTouchPoints > 0))
+      }
+      function triage_sleep(milliseconds) {
+        var start = new Date().getTime();
+        for (var i = 0; i < 1e7; i++) {
+          if ((new Date().getTime() - start) > milliseconds){
+            break;
+          }
+        }
+      }      
+      function bdslegalloadPopup(popid){
+      //loads popup only if it is disabled
+          var speed = Drupal.settings.triage_popup.speed;
+          if(popupStatus===0){
+              $("#triage-popup").css({"opacity": "0.7"});
+              $("#triage-popup").delay(speed).fadeIn("slow");
+              $("#"+popid).delay(speed).fadeIn("slow");
+          }
+      }
+      //disabling popup with jQuery magic! 
+      function bdslegaldisablePopup(popid){
+      //disables popup only if it is enabled
+          if(popupStatus===1){
+              $("#triage-popup").fadeOut("slow");
+              $("#"+popid).fadeOut("slow");
+          }
+      }      
+      //centering popup
+      function bdslegalcenterPopup(popid){
+        //request data for centering
+        var windowWidth = document.documentElement.clientWidth;
+        var windowHeight = document.documentElement.clientHeight;
+        var popupHeight = $("#"+popid).height();
+        var popupWidth = $("#"+popid).width();
+        //centering
+        $("#"+popid).css({
+            "position": "fixed",
+            "top": windowHeight/2-popupHeight/2 -100,
+            "left": windowWidth/2-popupWidth/2
+        });
+        //only need force for IE6  
+        $("#triage-popup").css({
+        "height": windowHeight
+        });
+      }
+        //LOADING POPUP
+        //Click the button event!
+        //CLOSING POPUP
+      $("#bdslegalpopupClose").click(function(){
+            bdslegaldisablePopup('bdslegalpopup');
+            popupStatus = 0;
+      });
+      $(".no-popbutton").click(function(){
+          var url = window.location.protocol + "//" + window.location.host + Drupal.settings.basePath + "triage-no-thanks";
+          triage_getpopup(url);
+          bdslegaldisablePopup('bdslegalpopup');
+          popupStatus = 0;
+      });
+      $("#triage-popup").click(function(){
+          bdslegaldisablePopup('bdslegalpopup');
+          popupStatus = 0;
+      });
+      $(document).keypress(function(e){
+          if(e.keyCode===27){
+              bdslegaldisablePopup('bdslegalpopup');
+              popupStatus = 0;
+          }
+      });     
+    }
+  };
+})(jQuery);
+function triage_progress(grpid){
+  var steps = Drupal.settings.my_steps;
+  var title = Drupal.settings.my_progress_bar.title;
+  var extra = Drupal.settings.my_progress_bar.extra_step;
+  var len = steps.length;
+  if (extra){len++;}
+  var pct = 100*(1/len);
+  if(grpid==-1){
+    grpid = Drupal.settings.my_steps[0];
+  }
+  if (Drupal.settings.my_progress_bar.type == 'bar'){
+    origback = Drupal.settings.my_progress_bar.background;
+    origiconcolor = Drupal.settings.my_progress_bar.icon_color;
+    origactive = Drupal.settings.my_progress_bar.selected_back;
+    origtextcolor = Drupal.settings.my_progress_bar.text;
+    origactivetext = Drupal.settings.my_progress_bar.selected_text;
+    jQuery('.triage-step').removeClass('active');
+    jQuery('.triage-step').css('background-color',origback);
+    jQuery('.triage-step').css('color',origtextcolor);
+    jQuery('.triage-step-icon').removeClass('active');
+    jQuery('.triage-step-icon').css('color',origiconcolor);
+  }
+  if (grpid >= 0){
+    if (Drupal.settings.my_progress_bar.type == 'bar'){
+      jQuery('#step-last').css('background-color',origback);
+      jQuery('#step-last').css('color',origtextcolor);
+      jQuery('#step-last').removeClass('active')
+    }
+    for (i=0;i < len;i++){
+      grp = steps[i];
+      if (parseInt(grp)==grpid){
+        if (Drupal.settings.my_progress_bar.type == 'bar'){
+          jQuery('#step-' + steps[i]).css('background-color',origactive);
+          jQuery('#step-' + steps[i]).css('color',origactivetext);
+          jQuery('#icon-' + steps[i]).css('color',origactive);
+          jQuery('#step-' + steps[i]).addClass('active')
+          jQuery('#icon-' + steps[i]).addClass('active')
+        }
+        break;
+      }
+    }
+  }
+  else {
+    if (Drupal.settings.my_progress_bar.type == 'bar'){
+      jQuery('#step-last').css('background-color',origactive);
+      jQuery('#step-last').css('color',origactivetext);
+      jQuery('#step-last').addClass('active')    
+      jQuery('#icon-last').css('color',origactive);
+      jQuery('#icon-last').addClass('active')
+    }
+    i = len-1;
+  }
+  var curstep = i+1;
+  pct  = 100*(curstep/len);
+  //alert(curstep);
+  text = title + ' (Step ' + curstep + ' of ' +  (len) + ')';
+  jQuery.cookie('triage_current_step', curstep,{ path: '/' });
+  if (Drupal.settings.my_progress_bar.type == 'bar'){
+    jQuery('.triage-progress-bar').html(text);
+  }
+  if (Drupal.settings.my_progress_bar.type == 'bar'){
+    for (k=0;k < i; k++){
+        dist = i - k;
+        dist = Math.max(dist, 1);
+        len = steps.length-1;
+        len = Math.max(len, 2);
+        amt = 100/len;
+        op = (amt*dist)/100;
+        newcolor = ColorLuminance(origactive, op);
+        newcolor2 = ColorLuminance(origactivetext, (-op/1.25));
+        //alert(newcolor);
+        jQuery('#step-' + steps[k]).css('background-color',newcolor);
+        jQuery('#step-' + steps[k]).css('color',newcolor2);
+        jQuery('#icon-' + steps[k]).css('color',newcolor);
+    }
+  }
+  else{
+    alert('herllo');
+    var pie = '<span class="triage-chart" data-percent="' + pct +'"><span class="triage-percent"></span></span>';
+    jQuery('.triage-chart').remove();
+    jQuery('.ta-help-panel').prepend(pie);
+    jQuery('.triage-chart').easyPieChart({
+            animate: 500,
+            barColor: '#69c',
+            trackColor: '#ace',
+            scaleColor: false,
+            lineWidth: 20,
+            trackWidth: 16,
+            lineCap: 'butt',
+            onStep: function(from, to, percent) {
+                    jQuery(this.el).find('.triage-percent').text(Math.round(percent));
+            }
+    });
+    triage_chart = window.triage_chart = jQuery('.triage-chart').data('easyPieChart');
+  }  
+}
+function ColorLuminance(hex, lum) {
+  // validate hex string
+  hex = String(hex).replace(/[^0-9a-f]/gi, '');
+  if (hex.length < 6) {
+      hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+  }
+  lum = lum || 0;
+  // convert to decimal and change luminosity
+  var rgb = "#", c, i;
+  for (i = 0; i < 3; i++) {
+      c = parseInt(hex.substr(i*2,2), 16);
+      c = Math.round(Math.min(Math.max(0, c + (c * lum)), 255)).toString(16);
+      rgb += ("00"+c).substr(c.length);
+  }
+  return rgb;
+}
+function triage_loading(){
+  jQuery('div.triage-loading').remove();
+  jQuery('body').append("<div class='triage-loading'><i class='fa fa-spinner fa-spin'></i>Loading...</div>");
+  jQuery('div.triage-loading').show();
+}
+function isTriageInteger(s, fn){
+    if (typeof fn === 'undefined'){
+        fn = 'This Field';
+    }
+    var error="";
+    var i;
+    s = s.replace(",",'');
+    s = s.replace("$",'');
+    var find = s.indexOf(".");
+    if ( find > -1 ){
+        s = s.substring(0,find);
+    }
+    for (i = 0; i < s.length; i++){   
+        // Check that current character is number.
+        var c = s.charAt(i);
+        if (((c < "0") || (c > "9"))) {
+            error = fn + " must be a number only, with no commas or dollar sign\n";
+        };
+    }
+    if (fn=="Income"){
+        jQuery("#edit-triage-income").val(s);
+    }
+    // All characters are numbers.
+    return error;
+}

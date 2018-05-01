@@ -1,0 +1,9 @@
+<?php
+/**
+ * @file
+ * Installation and schema hooks for videoentity.module.
+ */
+
+/**
+ * Implements hook_schema().
+ */

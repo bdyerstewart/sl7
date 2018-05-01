@@ -1,0 +1,7 @@
+Online Classroom Module 7.x-1.1, 4-21-2015
+------------------------------
+Fix to permissions module to properly include the "Create Classroom" permission.
+
+Online Classroom Module 7.x-1.0, 12-1-2013
+------------------------------
+Initial release of online classroom Module.

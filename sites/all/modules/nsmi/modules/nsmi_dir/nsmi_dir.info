@@ -1,0 +1,8 @@
+; $Id$
+name = NSMI Directory
+description = "Display Yahoo like directory"
+dependencies[] = taxonomy
+dependencies[] = nsmi
+core = 6.x
+version = 6.x-1.0
+package = NSMI

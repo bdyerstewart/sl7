@@ -1,0 +1,11 @@
+name = "Classroom Permissions"
+description = "Permissions for Classroom Module"
+core = 7.x
+package = Online Classroom
+dependencies[] = "ctools"
+
+files[] = classroom_permissions.pages.inc
+
+version = "7.x-1.0"
+core = "7.x"
+

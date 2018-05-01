@@ -1,0 +1,6 @@
+; $Id: myservices.info,v 1.2 2008/02/23 03:53:10 quicksketch Exp $
+   name = My Services
+   description = Expose basic services
+   core = 6.x
+
+

@@ -1,0 +1,983 @@
+<?php
+
+/**
+ * @file
+ * Nodeorder Plus module.
+ */
+
+/**
+ * Implements hook_permission().
+ */
+function nodeorderplus_permission() {
+  return array(
+    'order nodes within categories' => array(
+      'title' => t('order nodes within categories'),
+      'description' => t('Choose ordering of nodes within a taxonomy term.'),
+    ),
+    'manage order nodes' => array(
+      'title' => t('Manage node order settings'),
+      'description' => t('Gives access to settings page.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_theme().
+ */
+function nodeorderplus_theme() {
+  return array(
+    'nodeorderplus_admin_display_form' => array(
+      'render element' => 'form',
+      'file' => 'nodeorderplus.admin.inc',
+    ),
+  );
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function nodeorderplus_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id == 'taxonomy_form_vocabulary') {
+    $is_orderable = $form['module']['#value'] == 'nodeorderplus';
+
+    $form['settings']['orderable'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Orderable'),
+      '#description' => t('If enabled, nodes may be ordered within this vocabulary.'),
+      '#weight' => 0.0075, // Try to have this show up after the 'Required' checkbox
+      '#default_value' => $is_orderable,
+    );
+
+    // Add a submit handler for saving the orderable settings
+    $form['#submit'][] = 'nodeorderplus_taxonomy_form_vocabulary_submit';
+
+    /*
+     * Why not implement hook_taxonomy?
+     *   hook_taxonomy sometimes gets called after editing terms;
+     *   in that case the orderable-value will not be available and thus the
+     *   orderable-setting on the vocabulary will always be disabled
+     */
+  }
+}
+
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+function nodeorderplus_taxonomy_form_vocabulary_submit($form, &$form_state) {
+  $vid = $form_state['values']['vid'];
+
+  if ($form_state['values']['orderable']) {
+    if ($form_state['values']['module'] != 'nodeorderplus') {
+      // Switching from non-orderable to orderable...
+      cache_clear_all('nodeorderplus:', 'cache', TRUE);
+
+      // Set weight to nid for all rows in term_node where
+      // the tid is in this vocabulary...
+      $tree = taxonomy_get_tree($vid);
+
+      $tids = array();
+
+      foreach ($tree as $term) {
+        $tids[] = $term->tid;
+      }
+
+      if (count($tids) > 0) {
+        $order = 'n.sticky DESC, tn0.weight';
+        // $sql_max = "SELECT MAX(weight) FROM {taxonomy_index} WHERE tid = %d";
+        /**
+         * @var SelectQuery
+         */
+        $tid = 0;
+        $query_max = db_select('taxonomy_index', 'ti')
+          ->condition('tid', $tid);
+        $query_max->addExpression('MAX(weight)', 'mweight');
+
+        foreach ($tids as $i => $tid) {
+          //select *current* nodes for the current term
+          $result = nodeorderplus_select_nodes(array($tid), 'and', 0, FALSE, $order, 0);
+
+          foreach ($result as $node) {
+            $max = $query_max->execute()->fetchField();
+            $max = (int)$max + 1;
+            db_update('taxonomy_index')
+              ->condition('nid', $node->nid)
+              ->condition('tid', $tid)
+              ->fields(array('weight' => $max))
+              ->execute();
+          }
+        }
+      }
+
+      db_update('taxonomy_vocabulary')
+        ->fields(array('module' => 'nodeorderplus'))
+        ->condition('vid', $vid)
+        ->execute();
+
+      drupal_set_message(t('You may now order nodes within this vocabulary.'));
+    }
+  }
+  else {
+    if ($form_state['values']['module'] == 'nodeorderplus') {
+      // Switching from orderable to non-orderable...
+      cache_clear_all('nodeorderplus:', 'cache', TRUE);
+
+      db_update('taxonomy_vocabulary')
+        ->fields(array('module' => 'taxonomy'))
+        ->condition('vid', $vid)
+        ->execute();
+
+      // Set weight to 0 for all rows in term_node where
+      // the tid is in this vocabulary...
+      $tree = taxonomy_get_tree($vid);
+
+      $tids = array();
+
+      foreach ($tree as $term) {
+        $tids[] = $term->tid;
+      }
+
+      if (count($tids)) {
+        db_update('taxonomy_index')
+          ->fields(array('weight' => 0))
+          ->condition('tid', $tids, 'IN')
+          ->execute();
+      }
+
+      drupal_set_message(t('You may no longer order nodes within this vocabulary.'));
+    }
+  }
+}
+
+/**
+ * Implements hook_link().
+ */
+function nodeorderplus_link($type, $node = 0, $main = 0) {
+  $links = array();
+
+  if (user_access('order nodes within categories') && variable_get('nodeorderplus_show_links_on_node', 1) > 0) {
+    // If this node belongs to any vocabularies that are orderable,
+    // stick a couple links on per term to allow the user to move
+    // the node up or down within the term...
+    if ($type == 'node') {
+      if (array_key_exists('taxonomy', $node)) {
+        $vocabularies = taxonomy_get_vocabularies();
+
+        if (variable_get('nodeorderplus_show_links_on_node', 1) == 2
+            && ((arg(0) == 'taxonomy' || arg(0) == 'nodeorderplus') && arg(1) == 'term')) {
+          $term = taxonomy_term_load(arg(2));
+          nodeorderplus_add_link($links, $vocabularies, $node, $term);
+        }
+        else if (variable_get('nodeorderplus_show_links_on_node', 1) == 1) {
+          foreach ($node->taxonomy as $term) {
+            nodeorderplus_add_link($links, $vocabularies, $node, $term);
+          }
+        }
+      }
+    }
+  }
+
+  return $links;
+}
+
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+function nodeorderplus_add_link(&$links, $vocabularies, $node, $term) {
+  $vocabulary = $vocabularies[$term->vid];
+
+  if ($vocabulary->module == 'nodeorderplus') {
+    $weights = nodeorderplus_get_term_min_max($term->tid);
+    $weight = db_query("SELECT weight FROM {taxonomy_index} WHERE nid = :nid AND tid = :tid", array(':nid' => $node->nid, ':tid' => $term->tid))->fetchField();
+
+    if ($weight > $weights["min"]) {
+      $links['nodeorderplus_move_up_' . $term->tid] = array(
+        'href' => "nodeorderplus/moveup/" . $node->nid . "/" . $term->tid,
+        'title' => t("move up in " . $term->name),
+        'query' => drupal_get_destination(),
+        'attributes' => array('title' => t("Move this " . $node->type . " up in its category.")),
+      );
+    }
+
+    if ($weight < $weights["max"]) {
+      $links['nodeorderplus_move_down_' . $term->tid] = array(
+        'href' => "nodeorderplus/movedown/" . $node->nid . "/" . $term->tid,
+        'title' => t("move down in " . $term->name),
+        'query' => drupal_get_destination(),
+        'attributes' => array('title' => t("Move this " . $node->type . " down in its category.")),
+      );
+    }
+  }
+}
+
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+function nodeorderplus_get_term_min_max($tid, $reset=FALSE) {
+  static $min_weights = array();
+  static $max_weights = array();
+
+  if ($reset) {
+    $min_weights = array();
+    $max_weights = array();
+  }
+
+  if (!isset($min_weights[$tid]) || !isset($max_weights[$tid])) {
+    $query = db_select('taxonomy_index', 'i')
+      ->fields('i', array('tid'))
+      ->condition('tid', $tid)
+      ->groupBy('tid');
+    $query->addExpression('MAX(weight)', 'max_weight');
+    $query->addExpression('MIN(weight)', 'min_weight');
+    $record = $query->execute()->fetch();
+
+    $min_weights[$tid] = $record->min_weight;
+    $max_weights[$tid] = $record->max_weight;
+  }
+
+  $weights["min"] = $min_weights[$tid];
+  $weights["max"] = $max_weights[$tid];
+
+  return $weights;
+}
+
+
+/**
+ * Implements hook_menu().
+ */
+function nodeorderplus_menu() {
+  $items = array();
+
+  $items['admin/config/system/nodeorderplus'] = array(
+    'title' => t('Nodeorder Plus'),
+    'description' => t('Allows the ordering of nodes within taxonomy terms.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nodeorderplus_admin'),
+    'access arguments' => array('manage order nodes'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['taxonomy/term/%/order'] = array(
+    'title' => t('Order nodes'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nodeorderplus_admin_display_form', 2),
+    'access callback' => 'nodeorderplus_order_access',
+    'access arguments' => array(2),
+    'file' => 'nodeorderplus.admin.inc',
+    'weight' => 1,
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  return $items;
+}
+
+/**
+ * Custom access function which determines whether or not the user is allowed to reorder nodes and if the link should be shown at all
+ */
+function nodeorderplus_order_access($tid) {
+  return user_access('order nodes within categories') 
+    && variable_get('nodeorderplus_link_to_ordering_page', 1)
+    && nodeorderplus_term_can_be_ordered($tid);
+}
+
+/**
+ * Custom access function which determines whether or not the user is allowed to reorder nodes and if the vocabulary is orderable
+ */
+function nodeorderplus_taxonomy_order_access($vid) {
+  return user_access('order nodes within categories') && variable_get('nodeorderplus_link_to_ordering_page_taxonomy_admin', 1) && nodeorderplus_vocabulary_can_be_ordered($vid);
+}
+
+
+/**
+ * NOTE: This is nearly a direct copy of taxonomy_select_nodes() -- see
+ *       http://drupal.org/node/25801 if you find this sort of copy and
+ *       paste upsetting...
+ *
+ * Finds all nodes that match selected taxonomy conditions.
+ *
+ * @param $tids
+ *   An array of term IDs to match.
+ * @param $operator
+ *   How to interpret multiple IDs in the array. Can be "or" or "and".
+ * @param $depth
+ *   How many levels deep to traverse the taxonomy tree. Can be a nonnegative
+ *   integer or "all".
+ * @param $pager
+ *   Whether the nodes are to be used with a pager (the case on most Drupal
+ *   pages) or not (in an XML feed, for example).
+ * @param $order
+ *   The order clause for the query that retrieve the nodes.
+ * @param $count
+ *   If $pager is TRUE, the number of nodes per page, or -1 to use the
+ *   backward-compatible 'default_nodes_main' variable setting.  If $pager
+ *   is FALSE, the total number of nodes to select; or -1 to use the
+ *   backward-compatible 'feed_default_items' variable setting; or 0 to
+ *   select all nodes.
+ * @return
+ *   A resource identifier pointing to the query results.
+ */
+function nodeorderplus_select_nodes($tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC', $count = -1) {
+  if (count($tids) > 0) {
+    // For each term ID, generate an array of descendant term IDs to the right depth.
+    $descendant_tids = array();
+    if ($depth === 'all') {
+      $depth = NULL;
+    }
+    foreach ($tids as $index => $tid) {
+      $term = taxonomy_term_load($tid);
+      $tree = taxonomy_get_tree($term->vid, $tid, $depth);
+      $descendant_tids[] = array_merge(array($tid), array_map('_taxonomy_get_tid_from_term', $tree));
+    }
+
+    if ($operator == 'or') {
+      $args = call_user_func_array('array_merge', $descendant_tids);
+      $placeholders = db_placeholders($args, 'int');
+      $sql = 'SELECT DISTINCT(n.nid), n.sticky, n.title, n.created, tn.weight FROM {node} n INNER JOIN {taxonomy_index} tn ON n.vid = tn.vid WHERE tn.tid IN (' . $placeholders . ') AND n.status = 1 ORDER BY ' . $order;
+      $sql_count = 'SELECT COUNT(DISTINCT(n.nid)) FROM {node} n INNER JOIN {taxonomy_index} tn ON n.vid = tn.vid WHERE tn.tid IN (' . $placeholders . ') AND n.status = 1';
+    }
+    else {
+      $joins = '';
+      $wheres = '';
+      $args = array();
+      $query = db_select('node', 'n');
+      $query->condition('status', 1);
+      foreach ($descendant_tids as $index => $tids) {
+        $query->join('taxonomy_index', "tn$index", "n.nid = tn{$index}.nid");
+        $query->condition("tn{$index}.tid", $tids, 'IN');
+      }
+      $query->fields('n', array('nid', 'sticky', 'title', 'created'));
+      // @todo: distinct?
+      $query->fields('tn0', array('weight'));
+      $query->orderBy('tn0.weight', 'ASC');
+      // @todo: ORDER BY ' . $order;
+      //$sql_count = 'SELECT COUNT(DISTINCT(n.nid)) FROM {node} n ' . $joins . ' WHERE n.status = 1 ' . $wheres;
+    }
+
+    if ($pager) {
+      if ($count == -1) {
+        $count = variable_get('default_nodes_main', 10);
+      }
+      $result = pager_query($sql, $count, 0, $sql_count, $args);
+    }
+    else {
+      if ($count == -1) {
+        $count = variable_get('feed_default_items', 10);
+      }
+
+      if ($count == 0) {
+        // TODO Please convert this statement to the D7 database API syntax.
+        $result = $query->execute();
+      }
+      else {
+        // TODO Please convert this statement to the D7 database API syntax.
+        $result = db_query_range($sql, $args);
+      }
+    }
+  }
+
+  return $result;
+}
+
+/**
+ * Move a node up or down in its category...
+ */
+function nodeorderplus_move_in_category($direction, $nid, $tid) {
+  // Note that it would be nice to wrap this in a transaction...
+
+  $up = ($direction == 'moveup');
+  $node = node_load($nid);
+  $destination = isset($_GET['destination']) ? $_GET['destination'] : $_GET['q'];
+
+  // Get the current weight for the node
+  $weight = db_query("SELECT weight FROM {taxonomy_index} WHERE nid = :nid AND tid = :tid", array(':nid' => $node->nid, ':tid' => $tid))->fetchField();
+
+  if ($up) {
+    $weights = nodeorderplus_get_term_min_max($tid);
+    if ($weight == $weights["min"]) {
+      drupal_set_message(t('%title cannot be moved up as it already is at the top.', array('%title' => $node->title)), 'error');
+      drupal_goto($destination);
+      return;
+    }
+
+    $sql = 'SELECT DISTINCT(n.nid), n.vid, tn.weight FROM {node} n INNER JOIN {taxonomy_index} tn ON n.vid = tn.vid WHERE tn.tid = %d AND n.status = 1 AND tn.weight <= %d ORDER BY tn.weight DESC';
+    $direction = 'up';
+  }
+  else {
+    $weights = nodeorderplus_get_term_min_max($tid);
+    if ($weight == $weights["max"]) {
+      drupal_set_message(t('%title cannot be moved down as it already is at the bottom.', array('%title' => $node->title)), 'error');
+      drupal_goto($destination);
+      return;
+    }
+
+    $sql = 'SELECT DISTINCT(n.nid), n.vid, tn.weight FROM {node} n INNER JOIN {taxonomy_index} tn ON n.vid = tn.vid WHERE tn.tid = %d AND n.status = 1 AND tn.weight >= %d ORDER BY tn.weight';
+    $direction = 'down';
+  }
+
+  $result = db_query_range('SELECT DISTINCT(n.nid), n.vid, tn.weight FROM {node} n INNER JOIN {taxonomy_index} tn ON n.vid = tn.vid WHERE tn.tid = :tn.tid AND n.status = :n.status AND tn.weight >= :tn.weight ORDER BY tn.weight', array(':tn.tid' => $tid, ':n.status' => 1, ':tn.weight' => $weight));
+
+  $node1 = db_fetch_object($result);
+  $node2 = db_fetch_object($result);
+
+  // Now we just need to swap the weights of the two nodes...
+  if (!$node1 || !$node2) {
+    drupal_set_message('There was a problem moving the node within its category.');
+    drupal_access_denied();
+    return;
+  }
+
+  $sql = "UPDATE {taxonomy_index} SET weight = %d WHERE nid = %d AND tid = %d";
+
+  // TODO Please review the conversion of this statement to the D7 database API syntax.
+  /* db_query($sql, $node1->weight, $node2->nid, $tid) */
+  db_update('taxonomy_term_node')
+  ->fields(array(
+    'weight' => $node1->weight,
+  ))
+  ->condition('nid', $node2->nid)
+  ->condition('tid', $tid)
+  ->execute();
+  // TODO Please review the conversion of this statement to the D7 database API syntax.
+  /* db_query($sql, $node2->weight, $node1->nid, $tid) */
+  db_update('taxonomy_term_node')
+  ->fields(array(
+    'weight' => $node2->weight,
+  ))
+  ->condition('nid', $node1->nid)
+  ->condition('tid', $tid)
+  ->execute();
+
+  $term = taxonomy_term_load($tid);
+  drupal_set_message(t("<em>%title</em> was moved $direction in %category...", array('%title' => $node->title, '%category' => $term->name)));
+
+  // Now send user to the page they were on before...
+  drupal_goto($_GET['destination']);
+}
+
+/**
+ * Returns TRUE if the node has terms in any orderable vocabulary...
+ */
+function nodeorderplus_can_be_ordered($node) {
+  $cid = 'nodeorderplus:can_be_ordered:' . $node->type;
+
+  if (($cache = cache_get($cid)) && !empty($cache->data)) {
+    return $cache->data;
+  }
+  else {
+    $can_be_ordered = FALSE;
+    
+    $fields = field_info_fields();
+    $nodeorderplus_vocabularies = array();
+    foreach ($fields as $field_name => $field) {
+      if ($field['type'] != 'taxonomy_term_reference'
+       || empty($field['bundles']['node'])
+       || !in_array($node->type, $field['bundles']['node'])) {
+        continue;
+      }
+
+      foreach ($field['settings']['allowed_values'] as $allowed_values) {
+        $nodeorderplus_vocabularies[] = $allowed_values['vocabulary'];
+      }
+    }   
+    
+    if (!empty($nodeorderplus_vocabularies)) {
+      $result = db_select('taxonomy_vocabulary', 'v')
+        ->condition('v.module', 'nodeorderplus')
+        ->condition('v.machine_name', $nodeorderplus_vocabularies, 'IN')
+        ->fields('v', array('vid'))
+        ->execute()
+        ->fetchColumn();
+
+      if ($result) {
+        $can_be_ordered = TRUE;
+      }
+    }
+
+    //permanently cache the value for easy reuse
+    cache_set($cid, $can_be_ordered, 'cache');
+
+    return $can_be_ordered;
+  }
+}
+
+/**
+ * Returns an array of the node's tids that are in orderable vocabularies...
+ */
+function nodeorderplus_orderable_tids($node, $reset=FALSE) {
+  $tids = array();
+  $orderable_tids = array();
+  $cid = 'nodeorderplus:orderable_tids:' . $node->type;
+
+  if (!$reset && ($cache = cache_get($cid)) && !empty($cache->data)) {
+    $orderable_tids = $cache->data;
+  }
+  else {
+    $query = db_select('taxonomy_index', 'i');
+    $query->join('taxonomy_term_data', 'd', 'd.tid = i.tid');
+    $query->join('taxonomy_vocabulary', 'v', 'v.vid = d.vid');
+    $query->condition('i.nid', $node->nid)
+      ->condition('v.module', 'nodeorderplus')
+      ->fields('i', array('tid'));
+    $tids = $query->execute()->fetchCol('tid');
+
+    //permanently cache the value for easy reuse
+    cache_set($cid, $tids, 'cache');
+  }
+
+  return $tids;
+}
+
+/**
+ * Returns an array of the node's tids that are in orderable vocabularies...
+ * Slower than nodeorder_orderable_tids but needed when tids are flushed in cache and database
+ * Adopted form API function taxonomy_build_node_index
+ */
+function nodeorderplus_orderable_tids_by_node($node) {
+  $tids = array();
+  foreach (field_info_instances('node', $node->type) as $instance) {
+    $field_name = $instance['field_name'];
+    $field = field_info_field($field_name);
+    if ($field['module'] == 'taxonomy' && $field['storage']['type'] == 'field_sql_storage') {
+      // If a field value is not set in the node object when node_save() is
+      // called, the old value from $node->original is used.
+      if (isset($node->{$field_name})) {
+        $items = $node->{$field_name};
+      }
+      elseif (isset($node->original->{$field_name})) {
+        $items = $node->original->{$field_name};
+      }
+      else {
+        continue;
+      }
+      foreach (field_available_languages('node', $field) as $langcode) {
+        if (!empty($items[$langcode])) {
+          foreach ($items[$langcode] as $item) {
+            $tids[$item['tid']] = $item['tid'];
+          }
+        }
+      }
+    }
+  }
+
+  return $tids;
+}
+
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+function nodeorderplus_get_tids($key, $value) {
+  $tids = array();
+
+  if (isset($value)) {
+    if ($key === "tags") {
+      foreach ($value as $vid => $names) {
+        $tids = array_merge($tids, nodeorderplus_get_tids($vid, $names));
+      }
+    }
+    else if (is_numeric($value)) {
+      $tids[] = $value;
+    }
+    else if (is_array($value)) {
+      foreach ($value as $tid) {
+        $tids[] = $tid;
+      }
+    }
+    else if (is_string($value)) {
+      $values = drupal_explode_tags($value);
+      $get_tid_sql = "SELECT tid FROM {taxonomy_term_data} WHERE name = '%s' AND vid = %d";
+      foreach ($values as $term_name) {
+        // TODO Please convert this statement to the D7 database API syntax.
+        $tids[] = db_query($get_tid_sql, $term_name, $key)->fetchField();
+      }
+    }
+  }
+
+  return $tids;
+}
+
+/**
+ * Returns TRUE if the vocabulary is orderable...
+ */
+function nodeorderplus_vocabulary_can_be_ordered($vid) {
+  $result = db_query("SELECT * FROM {taxonomy_vocabulary} WHERE module = :module AND vid = :vid", array(':module' => 'nodeorderplus', ':vid' => $vid));
+
+  if ($result->fetchAssoc()) {
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**
+ * Returns TRUE if the term is in an orderable vocabulary...
+ */
+function nodeorderplus_term_can_be_ordered($tid) {
+  $cid = 'nodeorderplus:term_can_be_ordered:' . $tid;
+
+  if (($cache = cache_get($cid)) && !empty($cache->data)) {
+    return $cache->data;
+  }
+  else {
+    $vid = db_query("SELECT vid FROM {taxonomy_term_data} WHERE tid = :tid", array(':tid' => $tid))->fetchField();
+
+    $result = db_query("SELECT * FROM {taxonomy_vocabulary} WHERE module = :module AND vid = :vid", array(':module' => 'nodeorderplus', ':vid' => $vid));
+
+    $term_can_be_ordered = FALSE;
+    if ($result->fetch()) {
+      $term_can_be_ordered = TRUE;
+    }
+
+    //permanently cache the value for easy reuse
+    cache_set($cid, $term_can_be_ordered, 'cache');
+
+    return $term_can_be_ordered;
+  }
+}
+
+/**
+ * Implements hook_node_presave().
+ */
+function nodeorderplus_node_presave($node) {
+  if (nodeorderplus_can_be_ordered($node)) {
+    if (!isset($node->nodeorderplus)) {
+      $node->nodeorderplus = array();
+
+      // When a node gets loaded, store an element called 'nodeorderplus' that contains
+      // an associative array of tid to weight...
+      $result = db_query('SELECT tid, weight, style FROM {taxonomy_index} WHERE nid = :nid', array(':nid' => $node->nid));
+      foreach ($result as $term_node) {
+        $node->nodeorderplus[$term_node->tid]['weight'] = $term_node->weight;
+        $node->nodeorderplus[$term_node->tid]['style'] = $term_node->style;
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_node_delete().
+ * Handle lists in which the node is removed
+ */
+function nodeorderplus_node_delete($node) {
+  // get tids from node var; in the database they're already removed
+  $tids = nodeorderplus_orderable_tids_by_node($node);
+  foreach ($tids as $tid) {
+    nodeorderplus_handle_node_lists_decrease($tid);
+  }
+}
+
+/**
+ * Implements hook_node_insert().
+ * Handle the weights of the node in the taxonomy orderable lists it id added
+ */
+function nodeorderplus_node_insert($node) {
+  $tids = nodeorderplus_orderable_tids($node, TRUE);
+  foreach ($tids as $tid) {
+    nodeorderplus_add_node_to_list($node, $tid);
+  }
+}
+
+/**
+ * Implements hook_node_load().
+ */
+function nodeorderplus_node_load($nodes, $types) {
+  if (arg(0) == 'taxonomy' && arg(1) == 'term' && arg(2)) $tid = arg(2);
+  else $tid = '';
+  $query = db_select('taxonomy_index', 't')
+    ->condition('nid', array_keys($nodes), 'IN');
+  if ($tid) $query->condition('tid', $tid);
+  $result = $query
+    ->fields('t', array('weight', 'style', 'nid'))
+    ->execute();
+
+  foreach ($result as $record) {
+    $nodes[$record->nid]->weight = $record->weight;
+    $nodes[$record->nid]->style = $record->style;
+  }
+}
+
+/**
+ * Implements hook_node_update().
+ * Handle the weights, which were reset on rebuild of the taxonomy
+ */
+function nodeorderplus_node_update($node) {
+  $tids = nodeorderplus_orderable_tids($node, TRUE);
+  $old_tids = $node->nodeorderplus;
+  foreach ($tids as $tid) {
+    // restore weight of unchanged terms, or leave as is if zero
+    if (isset($old_tids[$tid])) {
+      $old_weight = $old_tids[$tid]['weight'];
+      $old_style = $old_tids[$tid]['style'];
+      unset($old_tids[$tid]);
+
+      if (!$old_weight && !$old_style) continue;
+      $query = db_update('taxonomy_index')
+        ->fields(array('weight' => $old_weight, 'style' => $old_style))
+        ->condition('nid', $node->nid)
+        ->condition('tid', $tid)
+        ->execute();
+    }
+    // push new or newly orderable node to top of ordered list
+    else {
+      nodeorderplus_add_node_to_list($node, $tid);
+    }
+  }
+
+  // Handle lists in which the node is removed
+  // Note that the old tids are at this point only the ones that were not updated, the others were dropped when restoring above
+  foreach ($old_tids as $tid => $weight) {
+    nodeorderplus_handle_node_lists_decrease($tid);
+  }
+
+}
+
+/**
+ * Push new or newly orderable node to top of ordered list
+ * Original style of Node order
+ */
+function nodeorderplus_add_node_to_list_orig($node, $tid) {
+  // append new orderable node
+  $weights = nodeorderplus_get_term_min_max($tid); // get the cached weights
+  $query = db_update('taxonomy_index')
+    ->fields(array('weight' => $weights['min'] - 1))
+    ->condition('nid', $node->nid)
+    ->condition('tid', $tid)
+    ->execute();
+  // if new node out of range, push top nodes down filling the order gap
+  // this is when old list's min weight is top range
+  // except when new orderable node increases range (new list is not even)
+  $taxonomy_nids = taxonomy_select_nodes($tid, FALSE, FALSE, array('t.weight' => 'ASC'));
+
+  $new_node_out_of_range = (count($taxonomy_nids) % 2 == 0 && $weights['min'] == -ceil(count($taxonomy_nids) / 2));
+  if ($new_node_out_of_range) {
+    // collect top nodes
+    // note that while the node data is not yet updated in the database, the taxonomy is
+    $top_range_nids = array();
+    $previous_weight = $weights['min'] - 2;
+    foreach ($taxonomy_nids as $taxonomy_nid) {
+      $taxonomy_node_weight = db_select('taxonomy_index', 'i')
+        ->fields('i', array('weight'))
+        ->condition('tid', $tid)
+        ->condition('nid', $taxonomy_nid)
+        ->execute()
+        ->fetchField();
+
+      if ($taxonomy_node_weight > $previous_weight + 1)  break;
+      $previous_weight = $taxonomy_node_weight;
+      $top_range_nids[] = $taxonomy_nid;
+    }
+
+    // move top nodes down
+    $query = db_update('taxonomy_index');
+    $query->expression('weight', 'weight + 1');
+    $query->condition('nid', $top_range_nids, 'IN')
+      ->condition('tid', $tid)
+      ->execute();
+  }
+  // Make sure the weight cache is invalidated
+  nodeorderplus_get_term_min_max($tid, TRUE);
+}
+
+/**
+ * Push new or newly orderable node to bottom of ordered list
+ * New style of Node order plus
+ */
+function nodeorderplus_add_node_to_list($node, $tid) {
+  // append new orderable node
+  $weights = nodeorderplus_get_term_min_max($tid); // get the cached weights
+  $query = db_update('taxonomy_index')
+    ->fields(array('weight' => $weights['max'] + 1))
+    ->condition('nid', $node->nid)
+    ->condition('tid', $tid)
+    ->execute();
+  
+  // Make sure the weight cache is invalidated
+  nodeorderplus_get_term_min_max($tid, TRUE);
+}
+
+/**
+ * Reorder list in which the node is dropped and where the borders became out of range
+ */
+function nodeorderplus_handle_node_lists_decrease($tid) {
+  $taxonomy_nids = taxonomy_select_nodes($tid, FALSE, FALSE, array('t.weight' => 'ASC'));
+  if (!count($taxonomy_nids)) return;
+  $weights = nodeorderplus_get_term_min_max($tid, TRUE);
+  $range_border = ceil(count($taxonomy_nids) / 2);
+  // Out of range when one of both new list's border weights is corresponding range border
+  $border_out_of_range = ($weights['min'] < -$range_border || $weights['max'] > $range_border);
+  if ($border_out_of_range) {
+    $weight = -$range_border;
+    foreach ($taxonomy_nids as $nid) {
+      $query = db_update('taxonomy_index')
+        ->fields(array('weight' => $weight))
+        ->condition('nid', $nid)
+        ->condition('tid', $tid)
+        ->execute();
+      $weight++;
+    }
+    // Make sure the weight cache is invalidated
+    nodeorderplus_get_term_min_max($tid, TRUE);
+  }
+}
+
+
+/**
+ * Form for Admin Settings
+ */
+function nodeorderplus_admin($form, &$form_state) {
+  $form['nodeorderplus_show_links'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Display ordering links'),
+    '#description' => t('Choose whether to show ordering links. Links can be shown for all categories associated to a node or for the currently active category. It is also possible to not show the ordering links at all.'),
+  );
+  $form['nodeorderplus_show_links']['nodeorderplus_show_links_on_node'] = array(
+    '#type' => 'radios',
+    '#title' => t('Choose how to display ordering links'),
+    '#default_value' => variable_get('nodeorderplus_show_links_on_node', 1),
+    '#description' => 'When displaying links based on the context, they will only be shown on taxonomy and nodeorder pages.',
+    '#options' => array(t('Don\'t display ordering links'), t('Display ordering links for all categories'), t('Display ordering links based on the active category')),
+  );
+
+  $form['nodeorderplus_link_to_ordering_page'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Display link to the ordering page'),
+    '#description' => t('If enabled, a tab will appear on all <em>nodeorder/term/%</em> and <em>taxonomy/term/%</em> pages that quickly allows administrators to get to the node ordering administration page for the term.'),
+    '#default_value' => variable_get('nodeorderplus_link_to_ordering_page', 1),
+  );
+
+  $form['nodeorderplus_link_to_ordering_page_taxonomy_admin'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Display link to the ordering page on taxonomy administration page'),
+    '#description' => t('If enabled, a tab will appear on <em>admin/content/taxonomy/%</em> pages that quickly allows administrators to get to the node ordering administration page for the term.'),
+    '#default_value' => variable_get('nodeorderplus_link_to_ordering_page_taxonomy_admin', 1),
+  );
+
+  /*$form['nodeorderplus_replace_taxonomy_link'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Replace the link to <em>taxonomy/term/%</em> by <em>nodeorder/term/%</em>'),
+    '#description' => t('If enabled, links to regular <em>taxonomy/term/%</em> pages will always be replaced by links to their <em>nodeorder/term/%</em> counterpart. Otherwise, this will only happen on the <em>nodeorder/term/%</em> pages.'),
+    '#default_value' => variable_get('nodeorderplus_replace_taxonomy_link', 1),
+  );*/
+
+
+  return system_settings_form($form);
+}
+
+/**
+ * Display a tree of all the terms in a vocabulary, with options to
+ * order nodes within each one.
+ *
+ * This code was cut and pasted from taxonomy_overview_terms.  If
+ * If we were able to add another operation onto each term on the
+ * admin/content/taxonomy/VID page then we wouldn't even need this duplicate
+ * function.
+ *
+ * TODO - put in a patch for a taxonomy hook that lets us add
+ *        admin operation links per term...  maybe it would call
+ *        module_invoke_all('taxonomy', 'list', 'term', $term) and
+ *        array_merge the results with each $row[]...
+ */
+
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+function nodeorderplus_overview_terms($vid) {
+  if (!nodeorderplus_vocabulary_can_be_ordered($vid)) {
+    return t('This vocabulary is not orderable.  If you would like it to be orderable, check the Orderable box ') .
+      l(t('here'), 'admin/structure/taxonomy/edit/vocabulary' . $vid) . '.';
+  }
+
+  $header = array(t('Name'), t('Operations'));
+  $vocabularies = taxonomy_get_vocabularies();
+  $vocabulary = $vocabularies[$vid];
+  if (!$vocabulary) {
+    return drupal_not_found();
+  }
+
+  drupal_set_title(t('Terms in %vocabulary', array('%vocabulary' => $vocabulary->name)), PASS_THROUGH);
+  $start_from      = $_GET['page'] ? $_GET['page'] : 0;
+  $total_entries   = 0; // total count for pager
+  $page_increment  = 25; // number of tids per page
+  $displayed_count = 0; // number of tids shown
+
+  $tree = taxonomy_get_tree($vocabulary->vid);
+  foreach ($tree as $term) {
+    $total_entries++; // we're counting all-totals, not displayed
+    if (($start_from && ($start_from * $page_increment) >= $total_entries) || ($displayed_count == $page_increment)) {
+      continue;
+    }
+    $rows[] = array((isset($term->depth) && $term->depth > 0 ? theme('indentation', array('size' => $term->depth)) : '') . l($term->name, "nodeorderplus/term/$term->tid"), l(t('order nodes'), "nodeorderplus/term/$term->tid/order"));
+    $displayed_count++; // we're counting tids displayed
+  }
+
+  if (!$rows) {
+    $rows[] = array(array(
+        'data' => t('No terms available.'),
+        'colspan' => '2',
+      ));
+  }
+
+  $GLOBALS['pager_page_array'][] = $start_from; // FIXME
+  $GLOBALS['pager_total'][] = intval($total_entries / $page_increment) + 1; // FIXME
+
+  if ($total_entries >= $page_increment) {
+    $rows[] = array(array(
+        'data' => theme('pager', array('tags' => NULL)),
+        'colspan' => '2',
+      ));
+  }
+
+  return theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => 'taxonomy')));
+}
+
+/**
+ * Implements hook_views_data_alter().
+ */
+function nodeorderplus_views_data_alter(&$data) {
+  // taxonomy weight
+  $data['taxonomy_index']['weight'] = array(
+    'title' => t('Weight in tid'),
+    'help' => t('The term weight in tid field'),
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => TRUE,
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+  // taxonomy style
+  $data['taxonomy_index']['style'] = array(
+    'title' => t('Style in tid'),
+    'help' => t('The term style in tid field'),
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => TRUE,
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+}
+
+/**
+ * Implements hook_help().
+ */
+function nodeorderplus_help($path, $arg) {
+  switch ($path) {
+    case 'nodeorderplus/term/%/order':
+    case 'nodeorderplus/order/%':
+      $term = taxonomy_term_load($arg[2]);
+      $output = '<p>' . t('This page provides a drag-and-drop interface for ordering nodes. To change the order of a node, grab a drag-and-drop handle under the <em>Node title</em> column and drag the node to a new location in the list. (Grab a handle by clicking and holding the mouse while hovering over a handle icon.) Remember that your changes will not be saved until you click the <em>Save order</em> button at the bottom of the page.') . '</p>';
+
+      return $output;
+    case 'admin/structure/taxonomy/%/order':
+      $vocabulary = taxonomy_vocabulary_load($arg[3]);
+      $output = '<p>' . t('%capital_name is an orderable vocabulary. You may order the nodes associated with a term within this vocabulary by clicking the <em>order nodes</em> link next to the term.', array('%capital_name' => drupal_ucfirst($vocabulary->name)));
+
+      return $output;
+  }
+}

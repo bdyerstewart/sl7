@@ -1,0 +1,256 @@
+.forum-post-panel-main {
+    min-height: 0;
+}
+#forum-comments{
+    margin-left: 25px;
+}
+.forum-node-create-links-top {
+    margin-bottom: 3px;
+}
+.forum-table-wrap, .forum-table-topics {
+    margin-bottom: 3px;
+}
+.forum-node-create-links {
+    margin-bottom: 3px;
+}
+.og-context .views-row{
+    margin-bottom: 5px;
+    padding: 5px;    
+}
+.og-context .views-row-odd {
+    background-color: #F1F2F2;
+}
+.og-context .views-row p,.og-context .views-row table{
+    margin: 0 5px;
+}
+.og-context .wysiwyg-toggle-wrapper,
+    .og-context .text-format-wrapper .filter-wrapper{
+    display: none;
+}
+.facetapi-checkbox {
+    float: left;
+}
+.block-facetapi ul li.leaf{
+    list-style-type: none; 
+    list-style-image: none;
+    float: left;
+    width: 100%;
+}
+#center form#search-api-page-search-form{
+    margin-bottom: 5px;
+}
+#search-api-page-search-form .form-item{
+    display: inline-block;
+    margin: 0;
+}
+.search-api-page-results p{
+    margin-top: 3px;
+}
+#search-api-page-search-form .form-submit {
+    background-color: #1c4c6c;
+    border: 1px solid #000;
+    border-radius: 15px;
+    color: #fff;
+    padding: 3px 10px 5px;
+    text-decoration: none;
+}
+#search-api-page-search-form .form-submit:hover{
+    color: #000;
+    background-color: #C7E2A1;
+}
+ol.search-results{
+    margin: 0;
+    padding: 0;
+    border: 1px solid #ddd;
+}
+.search-results li{
+    margin-bottom: 0;
+}
+li.search-result{
+    padding: 5px;
+    margin: 0;
+}
+li.search-result.odd{
+    background-color: #F1F2F2;
+}
+.panel-pane {
+    border: 1px solid #999;
+    padding: 5px;
+}
+.pane-node-group-group .field-name-group-group {
+    border: 1px solid #000;
+    display: inline-block;
+    padding: 5px 10px;
+    margin-top: 5px;
+    border-radius: 10px;
+    background-color: gainsboro;
+}
+.pane-node-group-group .field-name-group-group:hover {
+    border: 1px solid #000;
+    display: inline-block;
+    padding: 5px 10px;
+    margin-top: 5px;
+    border-radius: 10px;
+    background-color: black;
+}
+.pane-node-group-group .field-name-group-group:hover a{
+    color: #fff;
+}
+fieldset {
+    background: none repeat scroll 0 0 #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 32px;
+    margin-top: 10px;
+    padding: 0 0 10px;
+    position: relative;
+    top: 12px;
+}
+fieldset.collapsible {
+    border: 1px solid #bbb;
+    padding: 0 10px;
+    position: relative;
+}
+fieldset.collapsed {
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-right-width: 0;
+    height: 1em;
+}
+html.js .collapse-text-fieldset legend {
+    font-size: 100%;
+    max-width: 98%;
+    height: 25px;
+    overflow: hidden;
+    border: 1px solid #bbb;
+    border-radius: 10px;
+    padding: 5px;
+}
+html.js fieldset.collapsible .fieldset-legend {
+    background: url(/misc/menu-expanded.png) 2px 40% no-repeat;
+    padding-left: 15px;
+    height: 30px;
+}
+html.js fieldset.collapsible .fieldset-legend {
+    display: block;
+}
+html.js fieldset.collapsed .fieldset-legend {
+    background-image: url(/misc/menu-collapsed.png);
+    background-position: 2px 30%;
+    height: 30px;
+}
+input.form-submit, 
+    input.form-file,
+    a.button {
+    -moz-border-bottom-colors: none;
+    -moz-border-left-colors: none;
+    -moz-border-right-colors: none;
+    -moz-border-top-colors: none;
+    background: rgba(0, 0, 0, 0) url("images/buttons.png") repeat-x scroll 0 0;
+    border-color: #e4e4e4 #d2d2d2 #b4b4b4;
+    border-image: none;
+    border-radius: 20px;
+    border-style: solid;
+    border-width: 1px;
+    color: #5a5a5a;
+    cursor: pointer;
+    /*font-family: "Lucida Grande",Verdana,sans-serif;*/
+    font-size: 1.077em;
+    font-weight: normal;
+    margin-bottom: 1em;
+    margin-right: 1em;
+    padding: 4px 17px;
+    text-align: center;
+}
+input.form-submit:hover{
+    background-color: #000;
+    color: #fff;
+}
+#edit-upload-und{
+    padding: 10px;
+}
+.page-node-693559 .statistics_counter{
+    display: none;
+}
+.page-node-693559 .node{
+    padding: 0;
+    margin: 0;
+}
+.page-node-693559 .block-views {
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+.view-og-all-user-group-content .views-row{
+    padding: 4px 10px 0;
+    border-bottom: 1px solid #cdcdcd;
+}
+.view-og-all-user-group-content .views-row-odd{
+    background-color: #dedede;
+}
+.view-og-all-user-group-content h3{
+    font-size: 115%;
+}
+.view-og-all-user-group-content .views-field-body{
+    padding: 0px 10px 0 30px;
+}
+.view-og-all-user-group-content .views-field-body p{
+    margin: 0;
+}
+body.sidebar-second #squeeze {
+    margin-right: 300px;
+}
+body.sidebar-second #center {
+    margin-right: -300px;
+}
+#wrapper #container .sidebar {
+    width: 300px;
+}
+#top-nav {
+    background: #fff none repeat scroll 0 0;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    clear: both;
+    float: right;
+    height: 25px;
+    list-style: outside none none;
+    margin: -16px -1px 0;
+    padding: 0 10px;
+    position: relative;
+    width: auto;
+    z-index: 9;
+}
+#top-nav li {
+  display: inline;
+  color: #a4a4a4;
+  margin: 0 auto;
+  line-height: 20px;
+  font-size: 13px;
+  font: 'Droid Sans', sans-serif;
+  padding-left: 11px;
+}
+#top-nav li a {
+  color: #000;
+  text-decoration: none;
+}
+#top-nav li a#feedback {
+  color: #325899;
+}
+.view-group-search .views-row{
+    border: 1px solid #dedede;
+    padding: 10px;
+}
+.view-group-search .views-row.views-row-odd{
+    background-color: #cdcdcd;
+}
+.view-group-search .views-row:hover{
+   background-color:#bbb;
+   color: #fff;
+   border: 1px solid #000;
+}
+.view-group-search .views-row:hover a:link{
+    color: #1550C6;
+}
+.ui-accordion h3.ui-accordion-header {
+    background: #a2b4f2 none repeat scroll 0 0;
+    overflow: hidden;
+}

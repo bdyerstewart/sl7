@@ -1,0 +1,345 @@
+<?php
+/*
+ * @file
+ * Drupal Module: Phiware Voice
+ * Adds a button and opens a pop-up to the commercial web service Phiware Voice (text to speech)
+ *
+ */
+
+/**
+
+ */
+//
+function phiwarevoice_block_info() {
+    $blocks = array();
+    $blocks['phiwarevoice_block'] = array(
+        'info' => t('Phiware Voice Block'), //The name that will appear in the block list.
+        'cache' => DRUPAL_NO_CACHE, 
+    );
+    return $blocks;
+}
+function phiwarevoice_block_view($delta = '') {
+  $block = "";
+  $ctext = "";
+  switch($delta){
+    case 'phiwarevoice_block':
+        $node = menu_get_object();
+        // Check were on a node
+        if ($node) {
+            $block['content'] = theme('phiwarevoice_render',array('node'=> $node));
+            $block['cache'] = DRUPAL_NO_CACHE;
+        }
+        break;
+    case 'Phiware Voice Block':
+        $node = menu_get_object();
+        // Check were on a node
+        if ($node) {
+            $block['content'] = theme('phiwarevoice_render',array('node'=> $node));
+            $block['cache'] = DRUPAL_NO_CACHE;
+        }
+        break;
+  }
+  return $block;
+}  
+/**
+ * Implementation of hook_init().
+ */
+function phiwarevoice_init() {
+  if (variable_get("phiwarevoice_type", "") == "link") {
+    drupal_add_js(drupal_get_path('module', 'phiwarevoice') . '/js/phiwarevoice.js');
+  }
+}
+
+/**
+ * Function invoked directly from the template
+ */
+function theme_phiwarevoice_button($variables) {
+  $node = $variables['node'];
+  echo theme('phiwarevoice_render', $node);
+}
+
+/**
+ * Render the form or link to the audio file, called via a block hook
+ */
+function theme_phiwarevoice_render($variables) {
+  $node = $variables['node'];
+  if (variable_get('phiwarevoice_node_'.$node->type, 0) == 0) {
+    return '';
+  } 
+  $img = array(
+        'path' => 'images/audio.png', 
+        'alt' => 'listen to this page',
+        'title' => 'Phiware Voice',
+  );
+  $phiwarevoice_nodeurl = urlencode(url('node/' . $node->nid, array('fragment' => '', 'query' => '', 'absolute' => TRUE, 'alias' => FALSE, 'prefix' => '')));
+  $phiwarevoice_customerid = variable_get("phiwarevoice_customerid", "");
+  $phiwarevoice_type = variable_get("phiwarevoice_type", "");
+  global $language;
+  if ($phiwarevoice_type == "form") {
+    $phiwarevoice_button = '<div id="vox"><form name="vox_form" action="http://tts-voice.phiware.com/' . $phiwarevoice_customerid . 'vox" method="post" target="_blank">
+                  <input type="image" alt="listen to this page" src="images.audio.png" accesskey="L" />
+                  <input type="hidden" name="url" value="' . $phiwarevoice_nodeurl . '" />';
+    if ($language->language) {
+      $phiwarevoice_button .= '<input type="hidden" name="lang" value="' . $language->language . '" />';
+      // BDS to deal with engligh and en-mob (mobile language)
+      $phiwarevoice_button = str_replace('en-mob', 'en', $phiwarevoice_button);
+    }
+    $phiwarevoice_button .= '</form></div>';
+  }
+  else {
+    $phiwarevoice_url = "http://tts-voice.phiware.com/" . $phiwarevoice_customerid . "vox?url=" . $phiwarevoice_nodeurl;
+    if ($language->language) {
+      $phiwarevoice_url .= '&lang=en-us' ;
+    }
+    $phiwarevoice_button = '<div id="vox">
+                              <a href="'. $phiwarevoice_url .'" onClick="phiwarevoice_popup(\''. $phiwarevoice_url .'\'); return false;" accesskey="L" target="_vox">
+                                '. theme('image',$img) .'</a>
+                              Listen to this Page
+                            </div>';
+  }
+  return $phiwarevoice_button;
+}
+
+/**
+ * Render the VOICE_BEGIN comment with the hidden node title
+ */
+function theme_phiwarevoice_begin($node) {
+  if (variable_get('phiwarevoice_node_'.$node->type, 0) == 0) {
+    return '';
+  } else { 
+    return '<!-- VOICE_BEGIN --><div style="display: none">' . $node->title . '</div>';
+  }
+}
+
+/**
+ * Render the VOICE_END comment
+ */
+function theme_phiwarevoice_end($node) {
+  
+  if (variable_get('phiwarevoice_node_'.$node->type, 0) == 0) {
+    return '';
+  } else { 
+    return '<!-- VOICE_END -->';
+  }
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function phiwarevoice_theme() {
+  return array(
+    'phiwarevoice_render' => array(
+      'variables' => array('node' => NULL)
+    ),
+    'phiwarevoice_button' => array(
+      'variables' => array('node' => NULL)
+    ),
+    'phiwarevoice_begin' => array(
+      'variables' => array('node' => NULL)
+    ),
+    'phiwarevoice_end' => array(
+      'variables' => array('node' => NULL)
+    )
+  );
+}
+
+/**
+ * Implements hook_nodeapi().
+ */
+function phiwarevoice_node_view($node, $teaser, $langcode) {
+  // Check we've got a phiware voice customer id and that we're allowed to add the phiware voice code to this node
+  if (drupal_strlen(variable_get('phiwarevoice_customerid', '')) > 0 && variable_get('phiwarevoice_' . $node->type, 1)) {
+      $node->content["phiwarevoice_begin"]["#value"] = theme_phiwarevoice_begin($node);
+      $node->content["phiwarevoice_begin"]["#weight"] = variable_get('phiwarevoice_begin_weight', '');
+
+      $node->content["phiwarevoice_end"]["#value"] = theme_phiwarevoice_end($node);
+      $node->content["phiwarevoice_end"]["#weight"] = variable_get('phiwarevoice_end_weight', '');
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function phiwarevoice_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id == 'node_type_form') {
+    $form['identity']['phiwarevoice'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable Phiware Voice'),
+      '#default_value' => variable_get('phiwarevoice_' . $form['#node_type']->type, 1),
+      );
+  }
+}
+
+/**
+ * Show the fields to customize the service in the admin section
+ */
+function phiwarevoice_admin() {
+  $phiwarevoice_module_path = drupal_get_path('module', 'phiwarevoice');
+  drupal_add_css($phiwarevoice_module_path .'/css/phiwarevoice-admin.css', 'module', 'all', FALSE);
+  $form = array();
+
+//  $node_types = node_get_types('names');
+  $node_types = node_type_get_names();
+  if ($node_types) {
+    $form['node_settings'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Enable on'),
+      '#description' => t('Enable or disable the service on the following content type.'),
+      '#prefix' => '<div class="phiwarevoice-settings-right">',
+      '#suffix' => '</div>',
+    );
+    foreach ($node_types as $type => $name) {
+      $form['node_settings']["phiwarevoice_node_$type"] = array(
+        '#type' => 'checkbox',
+        '#title' => check_plain($name),
+        '#attributes' => (variable_get('phiwarevoice_node_'.$type, 0) == 1 ? array('checked' => "checked") : array())
+      );
+    }
+  }
+
+  $form['account_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Account Settings'),
+    '#description' => t('The parameters assigned by the service.'),
+    '#prefix' => '<div class="phiwarevoice-settings-left">',
+    '#suffix' => '</div>',
+  );
+  $form['account_settings']['phiwarevoice_customerid'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Customer Name'),
+    '#default_value' => variable_get('phiwarevoice_customerid', ''),
+    '#size' => 20,
+    '#maxlength' => 128,
+    '#description' => t('Your Phiware Voice customer name.'),
+    '#required' => TRUE
+  );
+
+  $form['display_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Display Settings'),
+    '#description' => t('Choose the way to display.'),
+    '#prefix' => '<div class="phiwarevoice-settings-left">',
+    '#suffix' => '</div>',
+  );
+  $form['display_settings']['phiwarevoice_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Type'),
+    '#default_value' => variable_get('phiwarevoice_type', ''),
+    '#description' => t('Type of the button.'),
+    '#options' => array(
+      'link' => t('Link'),
+      'form' => t('Form')
+    ),
+    '#required' => TRUE
+  );
+  $imageButtonTypesOptions = array(
+    "button_70.png" => theme('image',
+            array('path' => 'http://voice.phiware.com/resources/buttons/button_70.png',
+                'alt' => 'listen to this page',
+                'title' => 'Phiware Voice',
+            )),
+    "button_80.png" => theme('image',
+            array('path' => 'http://voice.phiware.com/resources/buttons/button_80.png',
+                'alt' => 'listen to this page',
+                'title' => 'Phiware Voice',
+            )),
+    "button_90.png" => theme('image',
+            array('path' => 'http://voice.phiware.com/resources/buttons/button_90.png',
+                'alt' => 'listen to this page',
+                'title' => 'Phiware Voice',
+            )),
+    "button_113.png" => theme('image',
+            array('path' => 'http://voice.phiware.com/resources/buttons/button_113.png',
+                'alt' => 'listen to this page',
+                'title' => 'Phiware Voice',
+            )),
+  );
+  $form['display_settings']['phiwarevoice_buttontype'] = array(
+    '#type' => 'radios',
+    '#title' => t('Button type'),
+    '#description' => t('Select which image you want to use as button.'),
+    '#default_value' => variable_get('phiwarevoice_buttontype', ''),
+    '#options' => $imageButtonTypesOptions
+  );
+
+  $form['advanced_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Advanced Settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+    '#prefix' => '<div class="phiwarevoice-settings-bottom">',
+    '#suffix' => '</div>',
+  );
+  $form['advanced_settings']['phiwarevoice_begin_weight'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Begin priority'),
+    '#default_value' => variable_get('phiwarevoice_begin_weight', ''),
+    '#size' => 5,
+    '#maxlength' => 128,
+    '#description' => t('Priority for &lt;!-- VOICE_BEGIN --&gt; tag'),
+    '#required' => TRUE
+  );
+  $form['advanced_settings']['phiwarevoice_end_weight'] = array(
+    '#type' => 'textfield',
+    '#title' => t('End priority'),
+    '#default_value' => variable_get('phiwarevoice_end_weight', ''),
+    '#size' => 5,
+    '#maxlength' => 128,
+    '#description' => t('Priority for &lt;!-- VOICE_END --&gt; tag'),
+    '#required' => TRUE
+  );
+
+  return system_settings_form($form);
+}
+
+/**
+ * Validate the admin form
+ */
+function phiwarevoice_admin_validate($form, &$form_state) {
+  if (!is_string($form_state['values']['phiwarevoice_customerid']) || drupal_strlen($form_state['values']['phiwarevoice_customerid'])<1) {
+    form_set_error('phiwarevoice_customerid', t('You must enter a customer name'));
+  }
+  if (!is_numeric($form_state['values']['phiwarevoice_begin_weight'])) {
+    form_set_error('phiwarevoice_begin_weight', t('You must enter a number for Begin priority'));
+  }
+  if (!is_numeric($form_state['values']['phiwarevoice_end_weight'])) {
+    form_set_error('phiwarevoice_end_weight', t('You must enter a number for End priority'));
+  }
+  if (!is_string($form_state['values']['phiwarevoice_buttontype'])) {
+    form_set_error('phiwarevoice_buttontype', t('You must choose an image for the button'));
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function phiwarevoice_menu() {
+  $phiwarevoice_access = array('administer phiware voice settings');
+  $items = array();
+  $items['admin/settings/phiwarevoice'] = array(
+    'title' => 'Phiware Voice settings',
+    'description' => 'Settings for Phiware Voice integration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('phiwarevoice_admin'),
+    'access arguments' => $phiwarevoice_access,
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_perm().
+ */
+function phiwarevoice_perm() {
+  return array('administer phiware voice settings');
+}
+
+/**
+ * Implements hook_help().
+ */
+function phiwarevoice_help($path, $arg) {
+  switch ($path) {
+    case 'admin/settings/phiwarevoice':
+      return t('<p> Visit <a href="@url">@url</a> for creating an account.</p>', array('@url' => url('http://voice.phiware.com')));
+  }
+}

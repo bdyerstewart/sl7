@@ -1,0 +1,99 @@
+<?php
+
+function triage_example_init(){
+    if (! variable_get('triage_example_compile',false)){
+        $file1 = 'convert_hier.inc';
+        $body_text = "Example Triage with full taxonomy and one endpoint example";
+        include $file1;
+        convert_triage_tax();
+        $voc = taxonomy_vocabulary_machine_name_load('me_triage');
+        if ($voc){
+            global $user;
+            //triage_add_fields($voc->vid);
+            if ( ! variable_get('triage_example_page_nid', 0)){
+                $node = new stdClass();
+                $node->title = "Triage Example";
+                $node->type = "triage_page";
+                $node->language = 'en';
+                $field_langcode = field_language('node', $node, 'body');
+                $node->body[$field_langcode][0]['value']   = $body_text;
+                $node->body[$field_langcode][0]['summary'] = text_summary($body_text);
+                $node->body[$field_langcode][0]['format']  = filter_default_format();   
+                $node->uid = $user->uid; 
+                $node->status = 1; //(1 or 0): published or not
+                $node->promote = 0; //(1 or 0): promoted to front page
+                $node->comment = 0; // 0 = comments disabled, 1 = read only, 2 = read/write        
+                node_object_prepare($node);
+                $node = node_submit($node); // Prepare node for saving
+                node_save($node);  
+                $ta_nid = $node->nid;
+                variable_set('triage_example_page_nid', $ta_nid);
+                ta_variable_set('triage_vocabulary',$voc->vid, $ta_nid);
+                //set status vid
+                $voc = taxonomy_vocabulary_machine_name_load('maine_triage_status_groups');
+                $vid = $voc->vid;
+                ta_variable_set('triage_status_voc',$vid,$ta_nid);
+                // set income vid
+                $voc = taxonomy_vocabulary_machine_name_load('triage_income_eligibility');
+                $vid = $voc->vid;
+                ta_variable_set('triage_income_eligibility',$vid,$ta_nid);
+                $format = db_query("select format from filter_format where name = 'plain text' ")->fetchColumn();
+                $one_state_vals['value'] = '';
+                $one_state_vals['format'] = $format;
+                ta_variable_set('triage_state','ME',$ta_nid);
+                ta_variable_set('triage_one_state_text', $one_state_vals, $ta_nid);
+                ta_variable_set('triage_status_table','field_triage_status_me_triage', $ta_nid);
+                ta_variable_get('triage_nav_type', 'bottom', $ta_nid);
+                triage_make_sample_actions($ta_nid);
+                $voc = taxonomy_vocabulary_machine_name_load('me_triage');
+                $vid = $voc->vid;
+                variable_set('triage_actions_admin_voc',$vid);
+            }
+        }  
+        variable_set('triage_example_compile',true);
+    }
+}
+//function triage_example_block_info() {
+//  $blocks['triage_example_block'] = array(
+//    'info' => t('Triage Menu Block'), //The name that will appear in the block list.
+//    'cache' => DRUPAL_NO_CACHE, 
+//  );
+//  return $blocks;
+//}  
+//function triage_example_block_view($delta = '') {
+//  global $user;
+//  global $base_path;
+//  global $base_url;
+//  $block = "";
+//  $id = '00c7aa59-a0d7-4885-a1a7-48de8d284188';
+//  $tid = db_query('select tid from taxonomy_term_data where uuid = :id',array(':id'=>$id))->fetchColumn();
+//  $m0 = $base_url . '/admin/structure/taxonomy_manager/voc/me_triage';
+//  $m1 = $base_url . '/triage_actions_admin';
+//  $m2 = $base_url . '/triage_actions_reuse_editor';
+//  $m3 = $base_url . '/node/' . variable_get('triage_example_page_nid',0) . '/edit';
+//  $m4 = $base_url . '/triage/me_triage';
+//  $m5 = $base_url . '/triage_actions_process/' . $tid . "/1";
+//  $m6 = $base_url . '/admin/reports/triage_summary';
+//  $m7 = $base_url . '/admin/config/system/triage';
+//  $m8 = 'http://bdsworks.org/quick-look-around-triage-example';
+//  $ctext = "<ul><li><a href='" . $m0 . "'>Example Logic Tree</a></li>
+//                <li><a href='" . $m3 . "'>Edit Triage Example Page</a></li>
+//                <li><a href='" . $m1 . "'>Triage Action Management</a></li>
+//                <li><a href='" . $m2 . "'>Action Text Editor</a></li>
+//                <li><a href='" . $m4 . "'>Run Triage</a></li>
+//                <li><a href='" . $m5 . "'>Endpoint Example</a></li>
+//                <li><a href='" . $m6 . "'>Triage Summary Report</a></li>
+//                <li><a href='" . $m7 . "'>Overall Triage Configuration</a></li>
+//                <li><a href='" . $m8 . "'>Triage Documentation</a></li>
+//            </ul>";
+//  //dsm($ctext);
+//  switch($delta){
+//
+//    case 'triage_example_block':
+//      $block['subject'] = 'Triage Menu';
+//      $block['content'] = $ctext;
+//      break;
+//  }
+//  //dsm($delta);  
+//  return $block;
+//}

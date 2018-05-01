@@ -1,0 +1,244 @@
+<?php
+
+/**
+ * @file
+ * Module file for the jquery_touch_swipe module.
+ */
+
+/**
+ * Implements hook_page_alter().
+ */
+function jquery_touch_swipe_page_alter(&$page) {
+  $is_loaded = jquery_touch_swipe_loaded();
+  $enabled = FALSE;
+  if ($is_loaded) {
+    $pages = variable_get('jquery_touch_swipe_select_pages', '');
+    $pages = explode("\r\n", $pages);
+    if (!empty($pages)) {
+      $enabled = jquery_touch_swipe_check_pages($pages);
+    }
+    if ($enabled) {
+      $page['header']['#attached']['js'] = libraries_load('jquery_touch_swipe');
+      if (module_exists('flag')) {
+        //take the flag types and the events associated.
+        $flag_settings = variable_get('jquery_touch_swipe_flag_events','');
+        $selector = variable_get('jquery_touch_swipe_flag_selector','');
+        if (isset($flag_settings) && !empty($flag_settings) && !empty($selector) && isset($selector)) {
+          $array_with_flags = explode("\r\n", $flag_settings);
+          $final = array();
+          foreach($array_with_flags as $single_event){
+            $array_with_single_association_flag_event = explode(',',$single_event);
+            $key = drupal_strtolower($array_with_single_association_flag_event[0]);
+            $value = drupal_strtolower($array_with_single_association_flag_event[1]);
+            $final[$key] = $value;
+          }
+          drupal_add_js(drupal_get_path('module','jquery_touch_swipe') . '/js/flag_touch_swipe.js');
+          drupal_add_js(array('touch_swipe' => array("flag_events" => array($final))), 'setting');
+          drupal_add_js(array('touch_swipe_selector' => array("selector" => array($selector))), 'setting');
+        }
+      }
+    }  
+  }
+}
+
+/**
+ * Implements hook_libraries_info().
+ */
+function jquery_touch_swipe_libraries_info() {
+  $libraries['jquery_touch_swipe'] = array(
+    'name' => 'Jquery Touch Swipe',
+    'vendor url' => 'https://github.com/mattbryson/TouchSwipe-Jquery-Plugin',
+    'download url' => 'https://github.com/mattbryson/TouchSwipe-Jquery-Plugin',
+    'version arguments' => array(
+      'file' => 'jquery.touchSwipe.js',
+      // @version 1.6.5
+      'pattern' => '@version\s+([0-9a-zA-Z\.-]+)@',
+      'lines' => 5,
+    ),
+    'files' => array(
+      'js' => array(
+        'jquery.touchSwipe.min.js',
+      ),
+    ),
+    'variants' => array(
+      'minified' => array(
+        'files' => array(
+          'js' => array(
+            'jquery.touchSwipe.min.js',
+          ),
+        ),
+      ),
+      'source' => array(
+        'files' => array(
+          'js' => array(
+            'jquery.touchSwipe.min.js',
+          ),
+        ),
+      ),
+    ),
+  );
+  return $libraries;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function jquery_touch_swipe_menu() {
+  $items = array();
+  $items['admin/config/user-interface/jquery-touch-swipe'] = array(
+    'title' => 'JQuery touch swipe settings',
+    'description' => 'JQuery touch swipe admin form',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('jquery_touch_swipe_admin_form'),
+    'access arguments' => array('jquery_touch_swipe_access'),
+  );
+  return $items;
+}
+
+
+/**
+ * Implements the admin form of jquery touch swipe().
+ */
+function jquery_touch_swipe_admin_form() {
+  $form = array();
+  $arraydesc['%blog'] = 'blog';
+  $arraydesc['%blog-wildcard'] = 'blog/*';
+  $arraydesc['%front'] = '<front>';
+  $description = t("Specify pages by using their paths. Enter one path per line. The '*' character is a wildcard. Example paths are %blog for the blog page and %blog-wildcard for every personal blog. %front is the front page.", $arraydesc);
+  $form['pages'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Enable jQuery touch swipe library on specific pages'),
+    '#default_value' => variable_get('jquery_touch_swipe_select_pages', ''),
+    '#description' => $description,
+  );
+	if(module_exists('flag')){
+	  $flag_desc = t("Here you can add touch events to a flag (see flag module) for example if you want to to associate the SINGLE_SWIPE_LEFT event to the flag type BOOKMARKS you need to insert the following row : BOOKMARKS,SINGLE_SWIPE_LEFT where bookmarks is the machine name of the flag and single_swipe_left is the touch event name. Enter one association per line. The flag integration is done only on touch devices");
+	  
+	  $header = array(
+      array('data' => t('Touch Events Available (IMPORTANT: the flag link must be set at javascript toggle type)'), 'class' => 'touch_swipe_header')   
+    );            
+    $rows[] = array(
+      array('data' => 'single_swipe_left : ' . t('Swipe with one finger to the left'), 'class' => 'touch_swipe_table_row'),
+    );
+    $rows[] = array(
+      array('data' => 'double_swipe_left : ' . t('Swipe with two fingers to the left'), 'class' => 'touch_swipe_table_row'),
+    );
+    $rows[] = array(
+      array('data' => 'swipe_down : ' . t('Swipe down with one or two fingers'), 'class' => 'touch_swipe_table_row'),
+    );
+    $rows[] = array(
+      array('data' => 'single_swipe_right : ' . t('Swipe with one finger to the right'), 'class' => 'touch_swipe_table_row'),
+    );
+	  $flag_guide_markup = theme('table',array('header' => $header, 'rows'=> $rows));
+    $form['events_flag'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Flag events'),
+      '#default_value' => variable_get('jquery_touch_swipe_flag_events', ''),
+      '#description' => $flag_desc,
+      '#prefix' => $flag_guide_markup
+    );
+    $form['touch_selector'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Insert a single class on which you want to attach the swipe event for the integration with flag'),
+      '#default_value' => variable_get('jquery_touch_swipe_flag_selector', ''),
+      '#description' => t('Attach swipe event for flag integration only on specific selectors, you can insert only classes not id (example for attach the event to selector .view i will insert the string "view")'),
+    );
+  }
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Save'));
+  return $form;
+}
+
+/**
+ * Implements the validate function of the admin form.
+ */
+function jquery_touch_swipe_admin_form_validate($form, &$form_state) {
+  $pages = explode("\r\n", $form_state['values']['pages']);
+  foreach ($pages as $page) {
+    // Convert path to lowercase. This allows comparison of the same path
+    // with different case. Ex: /Page, /page, /PAGE.
+    $page = drupal_strtolower($page);
+    if (strpos($page, '/*')) {
+      $page = str_replace('/*', '', $page);
+    }
+    if (!drupal_valid_path($page, TRUE) && !empty($form_state['values']['pages'])) {
+      if(drupal_lookup_path('alias',$page) === FALSE){
+          //TODO: implement alias validate
+      }
+    }
+  }
+}
+
+/**
+ * Implements the form submit.
+ */
+function jquery_touch_swipe_admin_form_submit($form, &$form_state) {
+  variable_set('jquery_touch_swipe_select_pages', $form_state['values']['pages']);
+  variable_set('jquery_touch_swipe_flag_events',trim($form_state['values']['events_flag']));
+  variable_set('jquery_touch_swipe_flag_selector',trim($form_state['values']['touch_selector']));
+  drupal_set_message(t('The configuration of jQuery touch swipe is correctly updated'));
+}
+
+/**
+ * Implements hook_permission().
+ */
+function jquery_touch_swipe_permission() {
+  return array(
+    'jquery_touch_swipe_access' => array(
+      'title' => t('Administrate the configuration of jquery touch swipe module'),
+      'description' => t('Permissions for jQuery touch swipe module'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_help().
+ */
+function jquery_touch_swipe_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#jquery_touch_swipe':
+      return '<p>' . t('The form allows you to use jQuery touch swipe only on specific pages. Users can load the library on every page by setting node/* .') . '</p>';
+  }
+}
+
+/**
+ * This function checks if the library is loaded or not.
+ */
+function jquery_touch_swipe_loaded() {
+  $library = libraries_detect('jquery_touch_swipe');
+  if ($library['installed']) {
+    return TRUE;
+  }
+  elseif (user_access('jquery_touch_swipe_access')) {
+    // Alert the authorized user/administrator to the abscence of the library.
+    drupal_set_message(t('The jQuery Touch Swipe Plugin Library could not be found. 
+                          Please check the installation instructions and the <a href="@status">Status Report</a>.',
+                          array('@status' => url('admin/reports/status'))), 'warning');
+  }
+}
+
+/**
+ * This functions checks if jQuery touch swipe can be used on the current page.
+ */
+function jquery_touch_swipe_check_pages($pages) {
+  $current = current_path();
+  $is_front = drupal_is_front_page();
+  if (in_array('<front>', $pages) && $is_front) {
+    return TRUE;
+  }
+  foreach ($pages as $page) {
+    $page = drupal_strtolower($page);
+    if ($position = strpos($page, '/*')) {
+      $page = str_replace('/*', '', $page);
+    }
+    if ($position) {
+      $checkstring = substr($current, 0, $position);
+    }
+    else {
+      $checkstring = $current;
+    }
+    if ($page == $checkstring) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}

@@ -1,0 +1,171 @@
+<?php
+
+function search_all_enable() {
+    
+    watchdog("search_all","begin enable");
+    $searchtypes = variable_get('search_all_types', array());
+    watchdog("search_all",implode(",",$searchtypes));
+    // Check if our field is not already created.
+
+    if (!field_info_field('field_sendtotop')) {
+        watchdog("search_all","add sendtotop");
+        $field = array(
+            'field_name' => 'field_sendtotop',
+            'type' => 'list_boolean',
+            'cardinality' => 1,
+            'widget' => array(
+                'type' => 'options_onoff',
+            ),
+            'settings' => array(
+                'allowed_values' => array(
+                    '0' => '0',
+                    '1' => 'Send to Top',
+                ),     
+            ),
+        );
+        field_create_field($field);
+
+        // Create the instance on the bundle.
+        foreach($searchtypes as $btype){
+            if ($btype=='0'){continue;}
+            $instance = array(
+                'field_name' => 'field_sendtotop',
+                'entity_type' => 'node',
+                'label' => 'Send to Top',
+                'bundle' => $btype,
+                'widget' => array(
+                    'type' => 'options_onoff',
+                ),
+                'display' => array(
+                    'default' => array(
+                        'label' => 'above',
+                        'type'  => 'hidden',
+                        ),
+                )   
+                );
+            field_create_instance($instance);
+        }
+  }
+  // Check if our field is not already created.
+  if (!field_info_field('field_promotags')) {
+    field_create_field(array(
+    'field_name' => 'field_promotags',
+    'type' => 'taxonomy_term_reference',
+    'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+    'translatable' => '0',
+    'entity_types' => array(),
+    'settings' => array(
+        'allowed_values' => array(
+            array(
+                'vocabulary' => 'tags',
+                'parent' => '0',
+            ),
+            ),
+        ),
+    ));
+    
+    foreach($searchtypes as $btype){
+        if ($btype=='0'){continue;}
+        $instance = array(
+            'field_name' => 'field_promotags',
+            'entity_type' => 'node',
+            'label' => 'Promote These Tags',
+            'bundle' => $btype,
+            'display' => array(
+                'default' => array(
+                    'label' => 'above',
+                    'type'  => 'hidden',
+                 ),
+             )   
+        );
+        field_create_instance($instance);
+    }
+  }  
+}
+/**
+ * Implementation of hook_schema()
+ */
+function search_all_schema() {
+    $schema['search_all_data'] = array(
+    'fields' => array(
+      'qid' => array(
+        'type' => 'serial',
+        'disp-width' => 11,
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+     ),
+      'tagged' => array(
+        'type' => 'int',
+        'description' => "Results from Tags",
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+    ),
+    'term' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'counter' => array(
+        'type' => 'int',
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      ),
+      'returns' => array(
+        'type' => 'int',
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      ),
+      'promotions' => array(
+        'type' => 'int',
+        'disp-width' => 11,
+        'not null' => FALSE,
+        'default' => 0,
+        'unsigned' => TRUE,
+      )
+    ),
+    'indexes' => array(
+      'term' => array('term'),
+      'tagged' => array('tagged'),
+      'returns' => array('returns'),
+      'promotions' => array('promotions'),
+    ),
+    'primary key' => array('qid')
+  );
+
+  $schema['search_all'] = array(
+    'description' => t('Stores search terms and dates'),
+    'fields' => array(
+      'qid' => array(
+        'type' => 'serial',
+        'disp-width' => 11,
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+     ),
+      'term' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'date' => array(
+        'description' => 'The Unix timestamp when the record was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0),
+    ),
+    'primary key' => array('qid'),
+    'indexes' => array(
+      'term' => array('term'),
+      'date' => array('date'),
+      ),
+    );
+    
+      return $schema;
+}

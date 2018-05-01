@@ -1,0 +1,43 @@
+<?php
+
+/**
+ * @file
+ * This module provides wysiwyg support for Federal Povery Guidelines insert.
+ */
+function pov_guides_init() {
+    $default_vals = "100,125,130,133,138,140,150,165,170,175,185,200,250,300,350";
+    $pov_guides = variable_get('pov_guides_vals', $default_vals);
+    $settings = array();
+    $settings['pov_guides'] = $pov_guides;
+    drupal_add_js($settings, 'setting');    
+}
+
+function pov_guides_menu() {
+  $items = array();
+  $items['admin/config/content/pov_guides'] = array(
+    'title' => 'Poverty Guidelines Configuration',
+    'access callback' => true,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('pov_guides_admin_form'),
+    'access arguments' => array('administer users'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+function pov_guides_admin_form($form, &$form_state) {
+    $default_vals = "100,125,130,133,138,140,150,165,170,175,185,200,250,300,350";
+    $form = array();
+    $form['pov_guides_vals'] = array(
+        '#type' => 'textfield',
+        '#default_value' => variable_get('pov_guides_vals', $default_vals) ,
+        '#title' => t('List of percentages to include'),
+    );
+    return system_settings_form($form); 
+}
+
+function pov_guides_wysiwyg_include_directory($type) {
+  switch ($type) {
+    case 'plugins':
+      return $type;
+  }
+}

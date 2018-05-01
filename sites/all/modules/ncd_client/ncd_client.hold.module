@@ -1,0 +1,516 @@
+<?php
+
+/**
+ *	NCD sharing module.
+ *	Client side.
+ *	M. Yunusov
+ *	Urban Insight Inc.
+ */
+
+/**
+ * 	Implementation of hook_menu().
+ */
+function ncd_client_menu() {
+	$items = array();
+	
+	$items['admin/content/shared_content'] = array(
+		'title' => t('NCD shared content'),
+		'page callback' => '_callback_ncd_shared_nodes',
+		'access arguments' => array('administer nodes'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	
+	$items['admin/content/shared_content/list'] = array(
+		'title' => t('List'),
+		'page callback' => '_callback_ncd_shared_nodes',
+		'access arguments' => array('administer nodes'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	
+	$items['admin/content/shared_content/settings'] = array(
+		'title' => t('RSS Feed Settings'),
+		'page callback' => '_callback_ncd_settings',
+		'access arguments' => array('administer nodes'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	
+	$items['ncd_client/feed.xml'] = array(
+		'title' => t(''),
+		'page callback' => '_callback_ncd_feed',
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+	);
+	
+	$items['ncd_client_token/send'] = array(
+		'title' => t(''),
+		'page callback' => '_callback_ncd_send_token',
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+	);
+	
+	return $items;
+}
+
+/**
+ *	Implementation of hook_perm().
+ */
+function ncd_client_perm() {
+	$perm = array();
+	$perm[] = 'access ncd shared content';
+	return $perm;
+}
+
+/**
+ *	Checking permissions to output RSS Feed.
+ */
+function _ncd_client_permission() {
+	return _shake_hands();
+}
+
+function _callback_ncd_send_token() {
+	$user_id = db_result(db_query("SELECT uid FROM {users} WHERE name = '%s'", 'ncdphantomuser'));
+	$account = user_load($user_id);
+	$get_token = db_result(db_query("SELECT token FROM {tokenauth_tokens} WHERE uid = %d", $account->uid));
+	$ncd_site = variable_get('ncd_client_rss_website', 'http://ost-ncd/') . '?q=ncd_server/authorize';
+	$p = "auth_token=1&client=1&action=post-token&value=" . $get_token . "&server=" . $_SERVER['HTTP_HOST'];
+	_ncd_client_do_request('POST', $ncd_site, $p);
+}
+
+/**
+ * 	Implementation of hook_node_operations().
+ */
+function ncd_client_node_operations() {
+	$operations = array(
+		'ncd_share' => array(
+			'label' => t('NCD: Add to sharing list'),
+			'callback' => '_callback_bulk_operations',
+			'callback arguments' => array('operation' => 'share'),
+		),
+		'ncd_lock' => array(
+			'label' => t('NCD: Remove from sharing list'),
+			'callback' => '_callback_bulk_operations',
+			'callback arguments' => array('operation' => 'remove'),
+		),
+	);
+	return $operations;
+}
+
+/**
+ *	Callback for hook_node_operations().
+ */
+function _callback_bulk_operations($nodes, $operation) {
+	switch ($operation) {
+		case 'share':
+			foreach ($nodes as $nid) {
+				if (!_default_ncd_sharing_value($nid)) {
+					$node = node_load($nid);
+					db_query("INSERT INTO {ncd_shared_nodes} (nid) VALUES(%d)", $node->nid);
+					drupal_set_message(t('Node <em>@title</em> added to sharing list', array('@title' => $node->title)));
+				}
+			}
+		break;
+		case 'remove':
+			foreach ($nodes as $nid) {
+				$node = node_load($nid);
+				db_query("DELETE FROM {ncd_shared_nodes} WHERE nid = %d", $node->nid);
+				drupal_set_message(t('Node <em>@title</em> removed from sharing list', array('@title' => $node->title)));
+			}
+		break;
+	}
+}
+
+/**
+ *	Callback for $item in hook_menu().
+ *	RSS Feed (Create from shared content)
+ */
+function _callback_ncd_feed() {
+	global $base_url;
+	
+	$rss_title = variable_get('ncd_client_rss_title', '');
+	$nodes = db_query("SELECT nid FROM {ncd_shared_nodes}");
+	$items = "";
+	while($row = db_fetch_object($nodes)) {
+		$node = node_load($row->nid);
+		$site_path = $base_url ;
+		$node_url = url('node/' . $node->nid);
+		$account = user_load($node->uid);
+		// print_r($node);
+		
+		$pkeys = array();
+		if (sizeof($node->taxonomy) > 0) {
+			foreach ($node->taxonomy as $term_id => $arr) {
+				$pkey = db_result(db_query("SELECT pkey FROM {nsmi} WHERE tid = %d", $term_id));
+				if (!in_array($pkey, $pkeys) && $pkey != '')
+					$pkeys[] = $pkey;
+			}
+		}
+		if ($node->field_private[0]['value'] == '' || !isset($node->field_private[0]['value'])) {
+			$access_level = 0;
+		}
+		else {
+			$access_level = $node->field_private[0]['value'];
+		}
+		$items .= theme('ncd_client_rss_item', $node->title, $site_path . $node_url, $node->body, $pkeys, $node->created, $account->name, $site_path, $node->nid, $access_level);
+	}
+	if (_ncd_client_permission()) {
+		// variable_get('ncd_client_rss_description', '') variable_get('ncd_client_rss_twitter', '')variable_get('ncd_client_rss_facebook', '')
+		$twitter = "";
+		$facebook = "";
+		if (variable_get('ncd_client_rss_twitter', '') != '')
+			$twitter = " Twitter:" . variable_get('ncd_client_rss_twitter', '');
+		if (variable_get('ncd_client_rss_facebook', '') != '')
+			$facebook = " Facebook: " . variable_get('ncd_client_rss_facebook', '');
+		$rss_description = variable_get('ncd_client_rss_description', '') . $twitter . $facebook;
+		print theme('ncd_client_rss_wrap', $items, $rss_title, $rss_description);
+	}
+	else
+		print drupal_access_denied();
+	exit();
+}
+
+/**
+ *	Curl requests
+ */
+function _ncd_client_do_request($method, $url, $vars) {
+    $ch = curl_init();
+    
+	$cookie_file = $_SERVER['DOCUMENT_ROOT'] . '/cookies.txt';
+	curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file);
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file);
+	
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_HEADER, 1);
+    curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT']);
+	//curl_setopt($ch, CURLOPT_USERPWD, "ostncd:apple"); 
+    //curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    if ($method == 'POST') {
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $vars);
+    }
+	curl_setopt($ch,  CURLOPT_AUTOREFERER, TRUE); 
+
+    $data = curl_exec($ch);
+    curl_close($ch);
+	//print_r($data);
+    $content = explode("\r\n", $data);
+	$result = explode(":", $content[sizeof($content) - 1]);
+	return $result;
+}
+
+/**
+ *
+ */
+function _shake_hands() {
+	$user_id = db_result(db_query("SELECT uid FROM {users} WHERE name = '%s'", 'ncdphantomuser'));
+	$account = user_load($user_id);
+	$get_token = db_result(db_query("SELECT token FROM {tokenauth_tokens} WHERE uid = %d", $account->uid));
+	
+	$base = variable_get('ncd_client_rss_website', 'http://ost-ncd/');
+	$base_site = str_replace(array('http://', '/', 'https://', 'www.'), "", $base);
+	$ncd_site = variable_get('ncd_client_rss_website', 'http://ost-ncd/') . '?q=ncd_server/authorize';
+	$vars = "auth_token=1&client=1&action=feed&server=" . $_SERVER['HTTP_HOST'];
+
+	$p = "auth_token=1&client=1&action=post-token&value=" . $get_token . "&server=" . $_SERVER['HTTP_HOST'];
+	_ncd_client_do_request('POST', $ncd_site, $p);
+	$result = _ncd_client_do_request('POST', $ncd_site, $vars);
+	if($result[1] == 'authorized' && $result[0] == $get_token && $_GET['token'] == $get_token) {
+		return TRUE;
+	}
+	else
+		return FALSE;
+}
+
+/**
+ *	Callback for $item in hook_menu().
+ *	List of shared nodes
+ */
+function _callback_ncd_shared_nodes() {
+	$settings = _settings_ncd_client();
+	$headers = array(
+		array(
+			'data' => t('Node title'),
+			'field' => 'title',
+		),
+		array(
+			'data' => t('Node type'),
+			'field' => 'type',
+		),
+	);
+	return theme('table', $headers, $settings['shared_nodes'], array('width' => '100%'));
+}
+
+/**
+ *	Callback for $item in hook_menu()
+ *	Settings page.
+ */
+function _callback_ncd_settings() {
+	return drupal_get_form('ncd_client_settings_form');
+}
+
+/**
+ * 	Implementation of hook_form_alter().
+ */
+function ncd_client_form_alter(&$form, &$form_state, $form_id) {
+	$settings = _settings_ncd_client();
+	foreach ($settings['content_types'] as $type => $type_name) {
+		if ($form_id == $type . '_node_form') {
+			$default_value = "";
+			$nid = $form['nid']['#value'];
+			if (!empty($nid)) {
+				$default_value = _default_ncd_sharing_value($nid);
+			}
+			$form['options']['sharing']['#type'] = 'checkbox';
+			$form['options']['sharing']['#title'] = t('NCD: Share node');
+			$form['options']['sharing']['#description'] = t('Check this to allow NCD to pull this content');
+			$form['options']['sharing']['#default_value'] = $default_value;
+		}
+	}
+}
+
+/**
+ * 	Implementation of hook_nodeapi().
+ */
+function ncd_client_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+	switch ($op) {
+		case 'insert' :
+			if (!_default_ncd_sharing_value($node->nid) && $node->sharing == 1) {
+				db_query("INSERT INTO {ncd_shared_nodes} (nid) VALUES(%d)", $node->nid);
+				drupal_set_message(t('Node added to sharing list', array('@title' => $node->title)));
+			}
+		break;
+		case 'update' :
+			if ($node->sharing == 0) {
+				db_query("DELETE FROM {ncd_shared_nodes} WHERE nid = %d", $node->nid);
+				drupal_set_message(t('Node removed from sharing list', array('@title' => $node->title)));
+			}
+			else {
+				if (!_default_ncd_sharing_value($node->nid) && $node->sharing == 1) {
+					db_query("INSERT INTO {ncd_shared_nodes} (nid) VALUES(%d)", $node->nid);
+					drupal_set_message(t('Node added to sharing list', array('@title' => $node->title)));
+				}
+			}
+		break;
+		case 'delete' :
+			db_query("DELETE FROM {ncd_shared_nodes} WHERE nid = %d", $node->nid);
+		break;
+	}
+}
+
+function ncd_client_preprocess_page($vars) {
+
+	$node = node_load($vars['node']->nid);
+	if ($node->type == 'public_page') {
+		$exists = db_result(db_query("SELECT nid FROM {ncd_shared_nodes} WHERE nid = %d", $node->nid));
+		if (!$exists) {
+			print drupal_access_denied();
+		}
+	}
+}
+
+/**
+ *	Settings page form
+ */
+function ncd_client_settings_form(&$form_state) {
+	$form = array();
+
+	$form['ncd_client_settings'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('RSS Feed Information'),
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+		'#tree' => TRUE,
+	);
+	
+	$form['ncd_client_settings']['ncd_client_rss_title'] = array(
+		'#type' => 'textfield',
+		'#title' => t('RSS Feed title'),
+		'#description' => t(''),
+		'#default_value' => variable_get('ncd_client_rss_title', ''),
+		'#size' => 100,
+	);
+	
+	$form['ncd_client_settings']['ncd_client_rss_description'] = array(
+		'#type' => 'textarea',
+		'#title' => t('Contact information'),
+		'#description' => t(''),
+		'#default_value' => variable_get('ncd_client_rss_description', ''),
+		'#size' => 50,
+	);
+	
+	$form['ncd_client_settings']['ncd_client_rss_twitter'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Twitter page'),
+		'#description' => t(''),
+		'#default_value' => variable_get('ncd_client_rss_twitter', ''),
+		'#size' => 50,
+	);
+	
+	$form['ncd_client_settings']['ncd_client_rss_facebook'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Facebook page'),
+		'#description' => t(''),
+		'#default_value' => variable_get('ncd_client_rss_facebook', ''),
+		'#size' => 50,
+	);
+
+	$form['ncd_settings'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('General Settings'),
+		'#collapsible' => TRUE,
+		'#collapsed' => TRUE,
+		'#tree' => TRUE,
+	);
+
+	$form['ncd_settings']['ncd_client_rss_allowed_tags'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Allowed HTML tags'),
+		'#description' => t(''),
+		'#default_value' => variable_get('ncd_client_rss_allowed_tags', '<a> <b> <br> <dd> <dl> <dt> <em> <i> <li> <ol> <p> <strong> <u> <ul> <table> <tr> <td> <thead> <tbody> <tfoot> <code>'),
+		'#size' => 100,
+	);
+	
+	$form['ncd_settings']['ncd_client_rss_website'] = array(
+		'#type' => 'textfield',
+		'#title' => t('NCD website URL'),
+		'#description' => t(''),
+		'#default_value' => variable_get('ncd_client_rss_website', 'http://ost-ncd/'),
+		'#size' =>45,
+	);
+	
+	$form['submit'] = array(
+		'#type' => 'submit',
+		'#value' => t('Update Settings'),
+	);
+
+	return $form;
+}
+
+function ncd_client_settings_form_submit(&$form, &$form_state) {
+	variable_set('ncd_client_rss_title', $form_state['values']['ncd_client_settings']['ncd_client_rss_title']);
+	variable_set('ncd_client_rss_description', $form_state['values']['ncd_client_settings']['ncd_client_rss_description']);
+	variable_set('ncd_client_rss_twitter', $form_state['values']['ncd_client_settings']['ncd_client_rss_twitter']);
+	variable_set('ncd_client_rss_facebook', $form_state['values']['ncd_client_settings']['ncd_client_rss_facebook']);
+	
+	variable_set('ncd_client_rss_allowed_tags', $form_state['values']['ncd_settings']['ncd_client_rss_allowed_tags']);
+	variable_set('ncd_client_rss_website', $form_state['values']['ncd_settings']['ncd_client_rss_website']);
+	
+	drupal_set_message(t('Changes have been saved.'));
+}
+
+/**
+ *	Settings
+ */
+function _settings_ncd_client() {
+	$settings = array();
+	$settings['content_types'] = node_get_types('names');
+	$settings['shared_nodes'] = array();
+	
+	$nodes = db_query("SELECT nid FROM {ncd_shared_nodes}");
+	
+	while($row = db_fetch_object($nodes)) {
+		$node = node_load($row->nid);
+		$shared_node = array();
+		$shared_node['title'] = l($node->title, 'node/' . $node->nid, array('html' => TRUE));
+		$shared_node['type'] = $settings['content_types'][$node->type];
+		$settings['shared_nodes'][] = $shared_node;
+	}
+	
+	return $settings;
+}
+
+/**
+ *	Generating list of allowed htmls
+ */
+function _callback_ncd_allowed_html_tags() {
+	$result = array();
+	$tags = variable_get('ncd_client_rss_allowed_tags', '<a> <b> <br> <dd> <dl> <dt> <em> <i> <li> <ol> <p> <strong> <u> <ul> <table> <tr> <td> <thead> <tbody> <tfoot> <code>');
+	$array = explode(" ", $tags);
+	foreach ($array as $tag) {
+		if (trim($tag) != '') {
+			$replacement = array('<', '>');
+			$result[] = str_replace($replacement, "", $tag);
+		}
+	}
+	return $result;
+}
+
+/**
+ *	Default value
+ */
+function _default_ncd_sharing_value($nid) {
+	$nid = db_result(db_query("SELECT nid FROM {ncd_shared_nodes} WHERE nid = %d", $nid));
+	if ($nid)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+function _ncd_sharing_filter_string($input) {
+	$body = filter_xss($input, preg_split('/\s+|<|>/', variable_get('ncd_client_rss_allowed_tags', '<a> <b> <br> <dd> <dl> <dt> <em> <i> <li> <ol> <p> <strong> <u> <ul> <table> <tr> <td> <thead> <tbody> <tfoot> <code>'), -1, PREG_SPLIT_NO_EMPTY));
+	$body = htmlspecialchars($body, ENT_NOQUOTES);
+	return $body;
+}
+
+/**
+ *	THEME: Implementation of hook_theme().
+ */
+function ncd_client_theme() {
+	return array(
+		'ncd_client_rss_wrap' => array(
+			'arguments' => array('items' => NULL, 'rss_title' => NULL),
+		),
+		'ncd_client_rss_item' => array(
+			'arguments' => array('title' => NULL, 'link' => NULL, 'content' => NULL, 'terms' => NULL, 'created' => NULL, 'creator' => NULL, 'host' => NULL, 'i' => NULL),
+		),
+	);
+}
+ 
+/**
+ *	THEME: Rss Feed wrapper.
+ */
+function theme_ncd_client_rss_wrap($items = '', $rss_title = '', $rss_description = '') {
+	global $base_url;
+	
+	$site_path = $base_url . base_path();
+	$rss_description = _ncd_sharing_filter_string($rss_description);
+	
+	$rss = '<?xml version="1.0" encoding="utf-8" ?>
+	<rss version="2.0" xml:base="' . $site_path . '" xmlns:dc="http://purl.org/dc/elements/1.1/">
+	  <channel>
+		<title>' . $rss_title . '</title>
+		<link>' . $site_path . '</link>
+		<description>' . $rss_description . '</description>
+		<type>ost</type>
+		<language>en</language>
+		' . $items . '
+	  </channel>
+	</rss>';
+	
+	return $rss;
+}
+
+/**
+ *	THEME: RSS Feed item.
+ */
+function theme_ncd_client_rss_item($title = '', $link = '', $content = '', $terms_list = array(), $created = '', $creator = '', $host, $nid, $access_level = 0) {
+
+	$body = _ncd_sharing_filter_string($content);
+	$title = htmlspecialchars($title);
+	
+	$rss = '
+	<item>
+		<title>' . $title . '</title>
+		<link>' . $link . '</link>
+		<description>' . $body . '</description>
+		<category>' . join(",", $terms_list) . '</category>
+		<pubDate>' . gmdate('r', $created) . '</pubDate>
+		<dc:creator>' . $creator . '</dc:creator> 
+		<guid isPermaLink="false">' . $nid . ' at ' . $host . '</guid>
+		<access isPrivate="false">' . (string)$access_level . '</access>
+	</item>';
+	
+	return $rss;
+}
+
+?>

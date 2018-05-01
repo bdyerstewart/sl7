@@ -1,0 +1,5 @@
+
+name = "Tingwo module"
+description = Enable Tingwo service fo text to speech conversion.
+package = "Other"
+core = 7.x

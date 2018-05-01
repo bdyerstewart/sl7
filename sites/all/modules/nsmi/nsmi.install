@@ -1,0 +1,101 @@
+<?php
+// $Id$
+
+/**
+ * Implementation of hook_schema().
+ */
+function nsmi_schema() {
+  $schema['nsmi'] = array(
+    'description' => t('Local NSMI table that syncs to the latest version of central NSMI.'),
+    'fields' => array(
+      'pkey' => array(
+        'description' => t('Primary key, aka Problem Code ID.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'tid' => array(
+        'description' => t('tid of currently associated vocabulary term.'),
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'top_heading' => array(
+        'description' => t('Top level heading.'),
+        'type' => 'varchar',
+        'length' => '250',
+        'not null' => FALSE,
+      ),
+      'l2_heading' => array(
+        'description' => t('2nd level heading.'),
+        'type' => 'varchar',
+        'length' => '250',
+        'not null' => FALSE,
+      ),
+      'l3_heading' => array(
+        'description' => t('3rd level heading.'),
+        'type' => 'varchar',
+        'length' => '250',
+        'not null' => FALSE,
+      ),
+      'l4_heading' => array(
+        'description' => t('4th level heading.'),
+        'type' => 'varchar',
+        'length' => '250',
+        'not null' => FALSE,
+      ),
+      'problem_code' => array(
+        'description' => t('7 digit problem code; not unique.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'cross_reference' => array(
+        'description' => t('Whether there is a preceeding row with the same problem code; mirrors NSMI spreadsheet, but not really used.'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'flag' => array(
+        'description' => t('Used temporarily to mark dropping terms.'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('pkey'),
+    'indexes' => array(
+      'top_heading' => array('top_heading'),
+      'l2_heading' => array('l2_heading'),
+      'l3_heading' => array('l3_heading'),
+      'l4_heading' => array('l4_heading'),
+      'tid' => array('tid'),
+    ),
+  );
+  
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+function nsmi_install() {
+  // Create tables.
+  drupal_install_schema('nsmi');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function nsmi_uninstall() {
+  // Remove tables.
+  drupal_uninstall_schema('nsmi');
+  
+  variable_del('nsmi_apikey');
+  variable_del('nsmi_associated_vid');
+  variable_del('nsmi_currver');
+  variable_del('nsmi_server');
+  variable_del('nsmi_ver2import');
+}

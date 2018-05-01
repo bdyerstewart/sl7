@@ -1,0 +1,12 @@
+#visitormap_canvas{
+  width: 100%;
+  height: 250px;
+}
+.vm-click-me{
+  font-size: 80%;
+}
+@media screen and (max-width: 639px){  
+    #block-visitormap-visitormap-now { 
+      display: none;
+    }
+}

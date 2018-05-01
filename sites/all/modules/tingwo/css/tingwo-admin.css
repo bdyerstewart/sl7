@@ -1,0 +1,16 @@
+/**
+ * Formatting for configuration
+ */
+.tingwo-settings-left {
+  width: 49%;
+}
+.tingwo-settings-right {
+  float: right;
+  width: 49%;
+}
+.tingwo-settings-right fieldset {
+  margin-top: 0px;
+}
+.tingwo-settings-bottom {
+  clear: both;
+}

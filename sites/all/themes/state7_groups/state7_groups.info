@@ -1,0 +1,10 @@
+name = Stateside Legal Group Theme
+description = Theme for Organic Groups on StatesideLegal based on Garland
+package = Core
+version = VERSION
+core = 7.x
+stylesheets[all][] = style.css
+stylesheets[all][] = state7_groups.css
+stylesheets[print][] = print.css
+scripts[] = state7_groups.js
+settings[state7_groups_width] = fluid

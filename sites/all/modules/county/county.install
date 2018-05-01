@@ -1,0 +1,167 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the county module.
+ *
+ * @author Jim Berry ("solotandem", http://drupal.org/user/240748)
+ */
+
+/**
+ * Implements hook_field_schema().
+ */
+function county_field_schema($field) {
+  return array(
+    'columns' => array(
+      'value' => array(
+        'type' => 'varchar',
+        'length' => 5,
+        'not null' => FALSE,
+      ),
+    ),
+    'indexes' => array(
+      'value' => array('value'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_schema().
+ */
+function county_schema() {
+  $schema['county_fips'] = array(
+    'description' => 'The US county FIPS table.',
+    'fields' => array(
+      'fips_state' => array(
+        'type' => 'varchar',
+        'length' => 2,
+        'not null' => TRUE,
+        'description' => 'The FIPS code for the state.',
+      ),
+     'fips_county' => array(
+        'type' => 'varchar',
+        'length' => 3,
+        'not null' => TRUE,
+        'description' => 'The FIPS code for the county.',
+      ),
+      'fips_class' => array(
+        'type' => 'varchar',
+        'length' => 2,
+        'not null' => TRUE,
+        'description' => 'The FIPS (or census) code for the administrative area class.',
+      ),
+      'state' => array(
+        'type' => 'varchar',
+        'length' => 2,
+        'not null' => TRUE,
+        'description' => 'The 2-character US state code.',
+      ),
+      'county' => array(
+        'type' => 'varchar',
+        'length' => 48,
+        'not null' => TRUE,
+        'description' => 'The US administrative area name.',
+      ),
+    ),
+    'primary key' => array('fips_state', 'fips_county'),
+  );
+
+  return $schema;
+}
+
+
+/**
+ * Implements hook_install().
+ */
+function county_install() {
+  // @todo Display the errors and counts?
+  list($errors, $counts) = county_import(NULL, TRUE);
+}
+
+/**
+ * Imports US county FIPS data.
+ */
+function county_import($filename = NULL, $insert = FALSE) {
+  global $rate_import_testing;
+
+  $errors = array();
+
+  $counts = array(
+    'rows' => 0,
+    'inserted_rows' => 0,
+  );
+
+  if (is_null($filename)) {
+    $filename = 'temporary://county_fips.csv';
+  }
+
+  // Change setting for this script only.
+  ini_set('auto_detect_line_endings', TRUE);
+  if (($handle = fopen($filename, 'rb')) === FALSE) {
+    return array($errors, $counts);
+  }
+
+  // Map spreadsheet columns to fields.
+  // @todo Allow in any order so long as all are present?
+  $map = array(
+    '0' => 'state',
+    '1' => 'fips_state',
+    '2' => 'fips_county',
+    '3' => 'county',
+    '4' => 'fips_class',
+  );
+
+  $line = 1;
+  // Read the first line with titles.
+  $data = fgetcsv($handle, 100, ",");
+  $num = count($data);
+  $brk = count($map);
+  for ($c = 0; $c < $brk; $c++) {
+    $expected = strtolower($map[$c]);
+    $column = strtolower(trim($data[$c]));
+    if ($column !== $expected) {
+      $errors['unknown parameter'][$c] = "column:$c|expected:$expected|actual:$column";
+    }
+    $columns[] = $column;
+  }
+
+  if (!empty($errors['unknown parameter'])) {
+    // No point to check values if required column headings do not match.
+    return array($errors, $counts);
+  }
+
+  $query = db_insert('county_fips')->fields($map);
+
+  // Read the other lines.
+  $row = 0;
+  $rate_id_default = 1000;
+  while (($data = fgetcsv($handle, 100, ",")) !== FALSE) {
+    $counts['rows']++;
+    $row++;
+    $valid = TRUE;
+    $num = count($data);
+    $line++;
+
+    $values = array_combine($map, $data);
+    $query->values($values);
+
+    if ($row % 50 == 0) {
+      if ($insert) {
+        // Insert 50 rows.
+        $query->execute();
+      }
+      $counts['inserted_rows'] += 50;
+    }
+  }
+
+  if ($row % 50) {
+    if ($insert) {
+      // Insert remaining rows.
+      $query->execute();
+    }
+    $counts['inserted_rows'] += $row % 50;
+  }
+  fclose($handle);
+
+  return array($errors, $counts);
+}

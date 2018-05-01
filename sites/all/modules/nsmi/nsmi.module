@@ -1,0 +1,973 @@
+<?php
+// $Id$
+
+/**
+ * @file nsmi.module
+ * Converts NSMI to vocabulary
+ */
+
+define('NSMI_SERVER', 'http://www.legalaidtech.org');
+
+/**
+ * Implementation of hook_help().
+ */
+function nsmi_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#nsmi':
+      $output = '<p>'. t('Converts NSMI to vocabulary.') .'</p>';
+      return $output;
+  }
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function nsmi_perm() {
+  return array('administer nsmi');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function nsmi_menu() {
+  $items['admin/settings/nsmi'] = array(
+    'title' => 'NSMI',
+    'description' => 'Import NSMI.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nsmi_import_form'),
+    'access arguments' => array('administer nsmi'),
+  );
+  $items['admin/settings/nsmi/import'] = array(
+    'title' => 'Import',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 0,
+  );
+  $items['admin/settings/nsmi/import/confirm'] = array(
+    'title' => 'Import Confirm',
+    'description' => 'Import NSMI.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nsmi_import_confirm'),
+    'access arguments' => array('administer nsmi'),
+    'type' => MENU_CALLBACK,
+    
+  );
+  $items['admin/settings/nsmi/convert'] = array(
+    'title' => 'Convert',
+    'description' => 'Convert NSMI to a vocabulary.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nsmi_convert_form'),
+    'access arguments' => array('administer nsmi'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 1,
+  );
+  $items['admin/settings/nsmi/cleanup'] = array(
+    'title' => 'Clean up',
+    'description' => 'Clean up NSMI vocabulary.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nsmi_clean_up_form'),
+    'access arguments' => array('administer nsmi'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 2,
+  );
+  $items['admin/settings/nsmi/cleanup/delete/legacy'] = array(
+    'title' => 'Delete legacy terms',
+    'description' => 'Delete legacy terms.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nsmi_delete_legacy_terms_confirm'),
+    'access arguments' => array('administer nsmi'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/settings/nsmi/cleanup/delete/custom'] = array(
+    'title' => 'Delete custom terms',
+    'description' => 'Delete custom terms.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nsmi_delete_custom_terms_confirm'),
+    'access arguments' => array('administer nsmi'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/settings/nsmi/diff'] = array(
+    'title' => 'Diff',
+    'description' => 'Show difference between standard NSMI and the custom vocabulary.',
+    'page callback' => 'nsmi_diff_page',
+    'access arguments' => array('administer nsmi'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 3,
+  );
+  $items['admin/settings/nsmi/diff/sync'] = array(
+    'title' => 'Sync term names',
+    'description' => 'Sync term names.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nsmi_diff_sync_confirm'),
+    'access arguments' => array('administer nsmi'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function nsmi_import_form() {
+  if (variable_get('nsmi_server', NSMI_SERVER) and variable_get('nsmi_apikey', '')) {
+    $new_ver = xmlrpc(variable_get('nsmi_server', NSMI_SERVER) . '/xmlrpc.php', 'nsmi.ver', variable_get('nsmi_apikey', ''));
+    if ($new_ver and empty($new_ver['error'])) {
+      $new_ver = '<p style="color:#33A333">'. t('Stable NSMI version:') . $new_ver['data'] . '</p>';
+    }
+    elseif ($new_ver and $new_ver['error']) {
+      $new_ver = '<p style="color:#a00">'. t('Latest NSMI version: server connection error; ') . $new_ver['error'] . '</p>';
+    }
+    else {
+      $new_ver = '<p style="color:#a00">'. t('NSMI Server is currently not available to check for new version.') .'</p>';
+    }
+  }
+  
+  $form['import']['curr_ver'] = array(
+    '#type' => 'item',
+    '#title' => t('Version'),
+    '#value' => t('Current local version: !ver', array('!ver' => variable_get('nsmi_currver', 'None'))) . $new_ver,
+  );
+  
+  $avail_ver = xmlrpc(variable_get('nsmi_server', NSMI_SERVER) . '/xmlrpc.php', 'nsmi.ver_all', variable_get('nsmi_apikey', ''));
+  if ($avail_ver and empty($avail_ver['error'])) {
+    $temp = $avail_ver['data'];
+    $avail_ver = array();
+    foreach ($temp as $v) {
+      $avail_ver[$v] = $v;
+    }
+  }
+  else {
+    $avail_ver = array('0' => t('Version info not available'));
+  }
+  
+  $form['import']['avail_ver'] = array(
+    '#type' => 'select',
+    '#title' => t('Available versions'),
+    '#options' => $avail_ver
+  );
+  
+  $form['import']['nsmi_server'] = array(
+    '#type' => 'textfield',
+    '#title' => t('NSMI Server'),
+    '#default_value' => variable_get('nsmi_server', NSMI_SERVER),
+  );
+
+  $form['import']['nsmi_apikey'] = array(
+    '#type' => 'textfield',
+    '#title' => t('API Key'),
+    '#default_value' => variable_get('nsmi_apikey', ''),
+  );
+
+  $form['apply'] = array(
+    '#type' => 'submit',
+    '#value' => t('Apply settings'),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Import NSMI'),
+  );
+  $form['info'] = array(
+    '#value' => t('Importing will wipe out existing data and rebuild NSMI table.')
+  );
+  
+  return $form;
+}
+
+function nsmi_import_form_validate($form, &$form_state) {
+  variable_set('nsmi_ver2import', trim($form_state['values']['avail_ver']));
+  variable_set('nsmi_server', trim($form_state['values']['nsmi_server']));
+  variable_set('nsmi_apikey', trim($form_state['values']['nsmi_apikey']));
+
+  if ($form_state['values']['op'] == t('Apply settings')) {
+    drupal_set_message(t('Settings saved.'));
+  }
+  elseif ($form_state['values']['op'] == t('Import NSMI')) {
+    drupal_goto('admin/settings/nsmi/import/confirm');
+  }  
+}
+
+function nsmi_import_confirm() {
+  if (variable_get('nsmi_server', NSMI_SERVER) and variable_get('nsmi_apikey', '')) {
+    $server_conn = xmlrpc(variable_get('nsmi_server', NSMI_SERVER) . '/xmlrpc.php', 'nsmi.ver', variable_get('nsmi_apikey', ''));
+  }
+  if ($server_conn and empty($server_conn['error'])) {
+    $server_conn = t('Passed');
+  }
+  else {
+    $server_conn = '<strong style="color:#a00">'. t('Not passed') .'</strong>';
+  }
+  
+  $info = '<p>
+<strong>'. t('Settings') .':</strong><br />'.
+t('Local version: ') . variable_get('nsmi_currver', 'None') . '<br />'.
+t('Version to import: ') . variable_get('nsmi_ver2import', '') . '<br />'.
+t('NSMI Server connection: ') . $server_conn .
+'</p>';
+
+  return confirm_form(array(), t('Are you sure you want to import NSMI?'),
+                  'admin/settings/nsmi', $info, t('Import'), t('Cancel'));
+}
+
+function nsmi_import_confirm_submit($form, &$form_state) {
+  // Rebuild nsmi table
+  if (variable_get('nsmi_server', NSMI_SERVER) and variable_get('nsmi_apikey', '')) {
+    $nsmi = xmlrpc(variable_get('nsmi_server', NSMI_SERVER) . '/xmlrpc.php', 'nsmi.nsmi', variable_get('nsmi_ver2import', '1.0'), variable_get('nsmi_apikey', ''));
+  }
+  
+  if (variable_get('nsmi_ver2import', '1.0') and $nsmi and empty($nsmi['error'])) {
+    $temp = array_shift($nsmi['data']);
+    
+    foreach ($temp as $k => $v) {
+      $fields[$v] = $k;
+    }
+    
+    // Reset flag to later determine dropped terms.
+    db_query("UPDATE {nsmi} SET flag = 0");
+    
+    $result = db_query("SELECT pkey FROM {nsmi}");
+    $curr_nsmi = array();
+    while ($row = db_fetch_object($result)) {
+      $curr_nsmi[] = $row->pkey;
+    }
+    foreach ($nsmi['data'] as $row) {
+      if (in_array($row[$fields['pkey']], $curr_nsmi)) {
+        db_query("UPDATE {nsmi} SET
+              top_heading = " . (trim($row[$fields['top_heading']]) ? "'" . addslashes(trim($row[$fields['top_heading']])) . "'" : 'NULL') .
+            ", l2_heading = " . (trim($row[$fields['l2_heading']])  ? "'" . addslashes(trim($row[$fields['l2_heading']])) . "'" : 'NULL') .
+            ", l3_heading = " . (trim($row[$fields['l3_heading']])  ? "'" . addslashes(trim($row[$fields['l3_heading']])) . "'" : 'NULL') .
+            ", l4_heading = " . (trim($row[$fields['l4_heading']])  ? "'" . addslashes(trim($row[$fields['l4_heading']])) . "'" : 'NULL') .
+            ", problem_code = " . (trim($row[$fields['problem_code']])    ? trim($row[$fields['problem_code']]) : '0') .
+            ", cross_reference = " . (trim($row[$fields['cross_reference']]) ? trim($row[$fields['cross_reference']]) : '0') .
+            ", flag = 1 WHERE pkey = %d",
+            $row[$fields['pkey']]
+        );
+      }
+      else {
+        db_query("INSERT INTO {nsmi} (pkey, top_heading, l2_heading, l3_heading, l4_heading, problem_code, cross_reference, flag) VALUES (%d" .
+            ", " . (trim($row[$fields['top_heading']]) ? "'" . addslashes(trim($row[$fields['top_heading']])) . "'" : 'NULL') .
+            ", " . (trim($row[$fields['l2_heading']])  ? "'" . addslashes(trim($row[$fields['l2_heading']])) . "'" : 'NULL') .
+            ", " . (trim($row[$fields['l3_heading']])  ? "'" . addslashes(trim($row[$fields['l3_heading']])) . "'" : 'NULL') .
+            ", " . (trim($row[$fields['l4_heading']])  ? "'" . addslashes(trim($row[$fields['l4_heading']])) . "'" : 'NULL') .
+            ", " . (trim($row[$fields['problem_code']])    ? trim($row[$fields['problem_code']]) : '0') .
+            ", " . (trim($row[$fields['cross_reference']]) ? trim($row[$fields['cross_reference']]) : '0') .
+            ", 1)",
+            $row[$fields['pkey']]
+        );
+      }
+    }
+    // Delete untouched (flag = 0) rows and reset flags to 0
+    db_query("DELETE FROM {nsmi} WHERE flag = 0");
+    db_query("UPDATE {nsmi} SET flag = 0");
+    variable_set('nsmi_currver', variable_get('nsmi_ver2import', ''));
+    
+    drupal_set_message(t('NSMI import sucessful.'));
+  }
+  else {
+    drupal_set_message(t('NSMI import failed.'), 'warning');
+  }
+  
+  $form_state['redirect'] = 'admin/settings/nsmi';
+}
+
+function nsmi_convert_form() {
+  drupal_add_js(drupal_get_path('module', 'nsmi') . '/nsmi.js');
+  
+  list($section, ) = explode('-', $_GET['section']);
+  
+  $section = $section === '' ? '1' : $section;
+  
+  if ($section) {
+    $top_headings = nsmi_get_nsmi_section($section);
+    $top_headings = implode("','", $top_headings);
+    $top_headings = "n.top_heading IN ('{$top_headings}')";
+  }
+  else {
+    $top_headings = '1';
+  }
+
+  $result = db_query("
+    SELECT n.*, n1.pkey AS parentkey
+    FROM nsmi n
+      LEFT JOIN nsmi n1 ON n.pkey != n1.pkey
+      AND n.top_heading = n1.top_heading
+      AND
+      (
+        (
+          COALESCE(n.l3_heading, n.l4_heading, n1.l2_heading, n1.l3_heading, n1.l4_heading) IS NULL
+          AND n.l2_heading IS NOT NULL
+        )
+        OR
+        (
+          n.l2_heading = n1.l2_heading
+          AND COALESCE(n.l4_heading, n1.l3_heading, n1.l4_heading) IS NULL
+          AND n.l3_heading IS NOT NULL
+        )
+        OR
+        (
+          n.l2_heading = n1.l2_heading
+          AND n.l3_heading = n1.l3_heading
+          AND n1.l4_heading IS NULL
+          AND n.l4_heading IS NOT NULL
+        )
+      )
+    WHERE {$top_headings}
+    ORDER BY n.top_heading, n.l2_heading, n.l3_heading, n.l4_heading"
+  );
+
+  $form['actions'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Convert NSMI (ver. !ver)', array('!ver' => variable_get('nsmi_currver', 'None'))),
+    '#weight' => -1,
+  );
+
+  $voc = taxonomy_vocabulary_load(variable_get('nsmi_associated_vid', 0));
+  $options = array();
+  if ($voc) {
+    $options[1] = $voc->name;
+    $default_value = 1;
+  }
+  $options[0] = t('New NSMI Vocabulary');
+  $form['actions']['vocabulary'] = array(
+    '#type' => 'radios',
+    '#title' => t('Vocabulary'),
+    '#default_value' => $default_value ? 1 : 0,
+    '#options' => $options,
+  );
+
+  $form['actions']['section'] = array(
+    '#type' => 'select',
+    '#title' => t('Section'),
+    '#description' => t('Please be patient if the borwser seems slow to show all. Browser might give a warning on delayed process. Continue and it should convert successfully.'),
+    '#options' => nsmi_get_nsmi_section(),
+    '#default_value' => $section === '0' ? '' : "$section-1",
+    '#attributes' => array(
+      'onchange' => "self.location.href='?section='+this.value"
+    ),
+  );
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Convert'),
+    '#attributes' => array(
+      'onclick' => "return $('#edit-vocabulary-0')[0].checked ? confirm('". t("A new vocabulary \\'NSMI vocabulary\\' will be created.\\nYou can change its name later.\\n\\nDo you want to create a new vocabulary?") ."') : true;"
+    )
+  );
+  
+  $terms_default = array();
+  while ($row = db_fetch_object($result)) {
+    $terms[$row->pkey] = '';
+    $form['head1'][$row->pkey] = array('#value' => nsmi_get_depth($row) == 0 ? "<strong style=\"font-size:1.2em\">$row->top_heading</strong>" : $row->top_heading);
+    $form['head2'][$row->pkey] = array('#value' => $row->l2_heading);
+    $form['head3'][$row->pkey] = array('#value' => $row->l3_heading);
+    $form['head4'][$row->pkey] = array('#value' => $row->l4_heading);
+    $form['depth'][$row->pkey] = array('#value' => nsmi_get_depth($row));
+    $form['parentkey'][$row->pkey] = array('#value' => $row->parentkey);
+    if ($row->tid) {
+      $terms_default[] = $row->pkey;
+      $form['selected'][$row->pkey] = array('#value' => 1);
+    }
+  }
+  $form['terms'] = array(
+    '#type' => 'checkboxes',
+    '#options' => $terms,
+    '#default_value' => $terms_default
+  );
+  return $form;
+}
+
+function nsmi_convert_form_submit($form, &$form_state) {
+  $checked = array_filter($form_state['values']['terms']);
+
+  if ($form_state['values']['vocabulary'] == 1) {
+    $voc = taxonomy_vocabulary_load(variable_get('nsmi_associated_vid', 0));
+  }
+  else {
+    $voc = NULL;
+  }
+  
+  // If a new vocabulary, have nsmi forget association with prev voc if any.
+  if (empty($voc)) {
+    db_query("UPDATE nsmi SET tid = NULL");
+  }
+
+  $terms = nsmi_get_nsmi_tree($checked);
+
+  $export = array('vocabulary' => $voc, 'terms' => $terms);
+
+  $new_vid = nsmi_taxonomy_import($export, $_GET['section']);
+  
+  variable_set('nsmi_associated_vid', (int)$new_vid);
+  
+  drupal_set_message(t('Please visit [Clean up] page to see if you want to drop terms from the vocabulary.'));
+
+  drupal_goto($_GET['q'], ($_GET['section'] ? "section=$_GET[section]" : ''));
+}
+
+function nsmi_clean_up_form() {
+  $result = db_query("SELECT td.*, s.name AS synonym FROM {term_data} td LEFT JOIN {nsmi} n ON td.tid = n.tid LEFT JOIN {term_synonym} s ON td.tid = s.tid WHERE n.tid IS NULL AND LENGTH(s.name) = 7 AND s.name BETWEEN '0000000' AND '9999999' AND td.vid = %d", variable_get('nsmi_associated_vid', 0));
+  
+  $legacy = array();
+  
+  while ($row = db_fetch_object($result)) {
+    if (is_numeric($row->synonym)) {
+      $current = taxonomy_get_term($row->tid);
+      $breadcrumb = array(l($current->name, 'dir/'. $current->tid) . ' (' . nsmi_dir_get_stats($current->tid) . ')');
+      $bc_sort = array($current->name);
+      while ($parents = taxonomy_get_parents($current->tid)) {
+        $current = array_shift($parents);
+        $breadcrumb[] = $current->name;
+        $bc_sort[] = $current->name;
+      }
+      $breadcrumb = array_reverse($breadcrumb);
+      $bc_sort = array_reverse($bc_sort);
+      
+      $list[implode('-', $bc_sort)] = '[' . l(t('Edit'), 'admin/content/taxonomy/edit/term/' . $row->tid, array('query' => 'destination=' . $_GET['q']) ) . '] ' . implode(' &gt; ', $breadcrumb);
+      $legacy[] = $row->tid;
+    }
+  }
+  if ($list) {
+    ksort($list);
+  }
+  else {
+    $list [] = 'No list';
+  }
+  
+  $form['legacy'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Legacy terms'),
+    '#description' => t('Terms that have been dropped from NSMI but remain in the vocabulary.'),
+  );
+  $form['legacy']['legacy_terms'] = array(
+    '#value' => theme('item_list', $list)
+  );
+  
+  $form['legacy']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Delete legacy terms'),
+  );
+  
+  $result = db_query("SELECT td.*, s.name AS synonym FROM {term_data} td LEFT JOIN {nsmi} n ON td.tid = n.tid LEFT JOIN {term_synonym} s ON td.tid = s.tid WHERE n.tid IS NULL AND (s.name IS NULL OR NOT (LENGTH(s.name) = 7 AND s.name BETWEEN '0000000' AND '9999999')) AND td.vid = %d", variable_get('nsmi_associated_vid', 0));
+  $list = array();
+  while ($row = db_fetch_object($result)) {
+    if (in_array($row->tid, $legacy)) {
+      continue;
+    }
+  
+    $current = taxonomy_get_term($row->tid);
+    $breadcrumb = array(l($current->name, 'dir/'. $current->tid) . ' (' . nsmi_dir_get_stats($current->tid) . ')');
+    $bc_sort = array($current->name);
+    while ($parents = taxonomy_get_parents($current->tid)) {
+      $current = array_shift($parents);
+      $breadcrumb[] = $current->name;
+      $bc_sort[] = $current->name;
+    }
+    $breadcrumb = array_reverse($breadcrumb);
+    $bc_sort = array_reverse($bc_sort);
+    
+    $list[implode('-', $bc_sort)] = '[' . l(t('Edit'), 'admin/content/taxonomy/edit/term/' . $row->tid, array('query' => 'destination=' . $_GET['q']) ) . '] ' . implode(' &gt; ', $breadcrumb);
+  }
+  if ($list) {
+    ksort($list);
+  }
+  else {
+    $list[] = t('No list');
+  }
+  
+  $form['custom'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Custom terms'),
+    '#description' => t('Terms that are not from NSMI.'),
+  );
+  $form['custom']['custom_terms'] = array(
+    '#value' => theme('item_list', $list)
+  );
+  
+  $form['custom']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Delete custom terms'),
+  );
+  
+  return $form;
+}
+
+function nsmi_clean_up_form_validate($form, &$form_state) {
+  if ($form_state['values']['op'] == t('Delete legacy terms')) {
+    drupal_goto('admin/settings/nsmi/cleanup/delete/legacy');
+  }
+  elseif ($form_state['values']['op'] == t('Delete custom terms')) {
+    drupal_goto('admin/settings/nsmi/cleanup/delete/custom');
+  }
+}
+
+function nsmi_delete_legacy_terms_confirm() {
+  return confirm_form(array(), t('Are you sure you want to delete the legacy terms in the NSMI vocabulary?'),
+         'admin/settings/nsmi/cleanup', t('The terms and all their children, if any, will be deleted.'),
+         t('Delete legacy terms'), t('Cancel'));
+}
+
+function nsmi_delete_legacy_terms_confirm_submit($form, &$form_state) {
+  $result = db_query("SELECT td.*, s.name AS synonym FROM {term_data} td LEFT JOIN {nsmi} n ON td.tid = n.tid LEFT JOIN {term_synonym} s ON td.tid = s.tid WHERE n.tid IS NULL AND LENGTH(s.name) = 7 AND s.name BETWEEN '0000000' AND '9999999' AND td.vid = %d", variable_get('nsmi_associated_vid', 0));
+  
+  while ($row = db_fetch_object($result)) {
+    // Delete only if tid exists, since it could have been deleted by its parent.
+    if (taxonomy_get_term($row->tid)) {
+      taxonomy_del_term($row->tid);
+      $deleted = TRUE;
+    }
+  }
+  if ($deleted) {
+    drupal_set_message(t('Legacy terms deleted.'));
+  }
+  else {
+    drupal_set_message(t('No legacy terms to delete.'));
+  }
+
+  $form_state['redirect'] = 'admin/settings/nsmi/cleanup';
+}
+
+function nsmi_delete_custom_terms_confirm() {
+  return confirm_form(array(), t('Are you sure you want to delete the custom terms in the NSMI vocabulary?'),
+         'admin/settings/nsmi/cleanup', t('The terms and all their children, if any, will be deleted.'),
+         t('Delete custom terms'), t('Cancel'));
+}
+
+function nsmi_delete_custom_terms_confirm_submit($form, &$form_state) {
+  $result = db_query("SELECT td.*, s.name AS synonym FROM {term_data} td LEFT JOIN {nsmi} n ON td.tid = n.tid LEFT JOIN {term_synonym} s ON td.tid = s.tid WHERE n.tid IS NULL AND LENGTH(s.name) = 7 AND s.name BETWEEN '0000000' AND '9999999' AND td.vid = %d", variable_get('nsmi_associated_vid', 0));
+  $legacy = array();
+  
+  while ($row = db_fetch_object($result)) {
+    if (is_numeric($row->synonym)) {
+      $legacy[] = $row->tid;
+    }
+  }
+  $result = db_query("SELECT td.*, s.name AS synonym FROM {term_data} td LEFT JOIN {nsmi} n ON td.tid = n.tid LEFT JOIN {term_synonym} s ON td.tid = s.tid WHERE n.tid IS NULL AND (s.name IS NULL OR NOT (LENGTH(s.name) = 7 AND s.name BETWEEN '0000000' AND '9999999')) AND td.vid = %d", variable_get('nsmi_associated_vid', 0));
+  
+  while ($row = db_fetch_object($result)) {
+    if (in_array($row->tid, $legacy)) {
+      continue;
+    }
+    // Delete only if tid exists, since it could have been deleted by its parent.
+    if (taxonomy_get_term($row->tid)) {
+      taxonomy_del_term($row->tid);
+      $deleted = TRUE;
+    }
+  }
+  
+  if ($deleted) {
+    drupal_set_message(t('Custom terms deleted.'));
+  }
+  else {
+    drupal_set_message(t('No custom terms to delete.'));
+  }
+  $form_state['redirect'] = 'admin/settings/nsmi/cleanup';
+}
+
+function nsmi_diff_page() {
+  $rows_changed = $rows_custom = array();
+
+  $voc = taxonomy_vocabulary_load(variable_get('nsmi_associated_vid', 0));
+  $tree = taxonomy_get_tree($voc->vid);
+
+  foreach ($tree as $term) {
+    $nsmi = db_fetch_object(db_query("SELECT * FROM {nsmi} WHERE tid = %d", $term->tid));
+    if ($nsmi) {
+      if (nsmi_get_term_name($nsmi) != $term->name) {
+        $current = $term;
+        $breadcrumb = array(l($current->name, 'dir/'. $current->tid));
+        $bc_sort = array($current->name);
+        while ($parents = taxonomy_get_parents($current->tid)) {
+          $current = array_shift($parents);
+          $breadcrumb[] = $current->name;
+          $bc_sort[] = $current->name;
+        }
+        $breadcrumb = array_reverse($breadcrumb);
+        $bc_sort = array_reverse($bc_sort);
+        
+        $rows_changed[implode('-', $bc_sort)] = array(
+          nsmi_get_term_fullname($nsmi),
+          implode(' &gt; ', $breadcrumb),
+        );
+      }
+    }
+    else {
+      $current = taxonomy_get_term($term->tid);
+      $breadcrumb = array(l($current->name, 'dir/'. $current->tid));
+      $bc_sort = array($current->name);
+      while ($parents = taxonomy_get_parents($current->tid)) {
+        $current = array_shift($parents);
+        $breadcrumb[] = $current->name;
+        $bc_sort[] = $current->name;
+      }
+      $breadcrumb = array_reverse($breadcrumb);
+      $bc_sort = array_reverse($bc_sort);
+      
+      $rows_custom[implode('-', $bc_sort)] = array(
+        t('- N/A -'),
+        implode(' &gt; ', $breadcrumb),
+      );
+    }
+  }
+  if ($rows_changed) {
+    ksort($rows_changed);
+  }
+  if ($rows_custom) {
+    ksort($rows_custom);
+  }
+  $header = array(t('NSMI Standard'), t('Local vocabulary') . " ($voc->name)");
+  $rows = array_merge($rows_changed, $rows_custom);
+  if (empty($rows)) {
+    $rows[] = array(
+      '',
+      t('The local vocabulary is in sync with NSMI.')
+    );
+  }
+  $out = theme('table', $header, $rows);
+  $out .= drupal_get_form('nsmi_diff_page_form');
+  
+  return $out;
+}
+
+function nsmi_diff_page_form() {
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Sync term names'),
+  );
+  $form['info'] = array(
+    '#value' => t('Overwrite the changed term names with NSMI standard.')
+  );
+  return $form;
+}
+
+function nsmi_diff_page_form_validate($form, &$form_state) {
+  drupal_goto('admin/settings/nsmi/diff/sync');
+}
+
+function nsmi_diff_sync_confirm() {
+  return confirm_form(array(), t('Are you sure you want to sync term names with NSMI standard?'),
+         'admin/settings/nsmi/diff', '',
+         t('Sync term names'), t('Cancel'));
+}
+
+function nsmi_diff_sync_confirm_submit($form, &$form_state) {
+
+
+  $voc = taxonomy_vocabulary_load(variable_get('nsmi_associated_vid', 0));
+  $tree = taxonomy_get_tree($voc->vid);
+
+  foreach ($tree as $term) {
+    $nsmi = db_fetch_object(db_query("SELECT * FROM {nsmi} WHERE tid = %d", $term->tid));
+    if ($nsmi) {
+      if (nsmi_get_term_name($nsmi) != $term->name) {
+        $term->name = nsmi_get_term_name($nsmi);
+        $term = (array)$term;
+        taxonomy_save_term($term);
+        $synched = TRUE;
+      }
+    }
+  }
+
+  if ($synched) {
+    drupal_set_message(t('Term names synched.'));
+  }
+  else {
+    drupal_set_message(t('No term names to sync.'));
+  }
+  
+  $form_state['redirect'] = 'admin/settings/nsmi/diff';
+}
+
+function nsmi_get_nsmi_section($section = 0) {
+  $cache = cache_get('nsmi_section');
+  
+  if ($cache and $cache->data) {
+    if ($section) {
+      $data = $cache->data;
+      return $data[$section];
+    }
+    else {
+      return $cache->data;
+    }
+  }
+  else {
+    $result = db_query("SELECT top_heading, COUNT(*) AS count FROM {nsmi} GROUP BY top_heading ORDER BY top_heading");
+
+    $heading_group = array('0' => '-- Show All --');
+    $headings = array();
+    $count = 0;
+    $index = 1;
+    $index2 = 1;
+
+    while ($row = db_fetch_object($result)) {
+      $headings["$index-$index2"] = $row->top_heading;
+      $index2++;
+      $count += $row->count;
+
+      if ($count > 100) {
+        $temp = array_pop($headings);
+        $heading_group[$index++] = $headings;
+        $headings = array("$index-1" => $temp);
+        $count = $row->count;
+        $index2 = 2;
+      }
+    }
+
+    if ($count) {
+      $heading_group[$index] = $headings;
+    }
+    
+    cache_set('nsmi_section', $heading_group, 'cache', CACHE_TEMPORARY);
+
+    if ($section) {
+      return $heading_group[$section];
+    }
+    else {
+      return $heading_group;
+    }
+  }
+}
+
+function nsmi_get_nsmi_tree($checked) {
+  if (empty($checked)) {
+    return array();
+  }
+  
+  $terms = array();
+  $parent = array(0);
+  $tid = -1; // Grow negative to make sure it does not conflict with real tid's
+  $reset_name = FALSE;
+  $result = db_query("SELECT * FROM nsmi WHERE pkey IN (%s) ORDER BY top_heading, l2_heading, l3_heading, l4_heading", implode(',', $checked));
+
+  while ($row = db_fetch_object($result)) {
+    $depth = nsmi_get_depth($row);
+    if ($prev_depth < $depth) {
+      $parent[] = $prev_tid;
+    }
+    elseif ($prev_depth > $depth) {
+      for ($i = 0; $i < $prev_depth - $depth; $i++) {
+        array_pop($parent);
+      }
+    }
+    if ($row->tid > 0 and !$reset_name) {
+      $t = taxonomy_get_term($row->tid);
+      $name = $t->name;
+    }
+    else {
+      $name = nsmi_get_term_name($row);
+    }
+    
+    $term = (object) array(
+      'pkey' => $row->pkey,
+      'tid' => $row->tid ? $row->tid : $tid,
+      'vid' => '1', // dummy value
+      'name' => $name,
+      'depth' => $depth,
+      'parents' => array(
+        0 => $parent[count($parent) - 1]
+      ),
+      'synonyms' => $row->problem_code
+    );
+
+    $terms[] = $term;
+
+    $prev_depth = $depth;
+    $prev_tid = $row->tid ? $row->tid : $tid--;
+  }
+  return $terms;
+}
+
+function theme_nsmi_convert_form($form) {
+  $header = array(
+    t('Top Heading'), t('Level 2 Heading'), t('Level 3 Heading'), t('Level 4 Heading'), ''
+  );
+  
+  $out = drupal_render($form['actions']);
+  
+  if (isset($form['head1']) and is_array($form['head1'])) {
+    foreach (element_children($form['head1']) as $key) {
+      $depth = $form['depth'][$key]['#value'];
+      $class = "s-$key " . ($form['parentkey'][$key]['#value'] ? 'p-'.$form['parentkey'][$key]['#value'] : '') . ($form['selected'][$key] ? ' selected' : '');
+      
+      $rows[] = array(
+        'data' => empty($form['head2'][$key]['#value']) ?
+          array(
+            array(
+              'data' => drupal_render($form['head1'][$key]),
+              'colspan' => 2
+            ),
+            drupal_render($form['head3'][$key]),
+            drupal_render($form['head4'][$key]),
+            drupal_render($form['terms'][$key])
+          ) :
+          array(
+            drupal_render($form['head1'][$key]),
+            drupal_render($form['head2'][$key]),
+            drupal_render($form['head3'][$key]),
+            drupal_render($form['head4'][$key]),
+            drupal_render($form['terms'][$key])
+          ),
+        'class' => $class,
+        'ui_sid' => $key,
+        'ui_pid' => $form['parentkey'][$key]['#value']
+      );
+    }
+  }
+  $out .= theme('table', $header, $rows);
+
+  unset($form['selected']);
+  unset($form['depth']);
+  unset($form['parentkey']);
+  $out .= drupal_render($form);
+  
+  return $out;
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function nsmi_theme() {
+  return array(
+    'nsmi_convert_form' => array(
+      'arguments' => array('form' => NULL),
+    ),
+  );
+}
+
+function nsmi_get_term_fullname($nsmi, $delim = '&gt;') {
+  $ret = $nsmi->top_heading;
+  if ($nsmi->l2_heading) {
+    $ret .= " $delim " . $nsmi->l2_heading;
+  }
+  if ($nsmi->l3_heading) {
+    $ret .= " $delim " . $nsmi->l3_heading;
+  }
+  if ($nsmi->l4_heading) {
+    $ret .= " $delim " . $nsmi->l4_heading;
+  }
+  return $ret;
+}
+
+function nsmi_get_term_name($term) {
+  if (trim($term->l4_heading)) return trim($term->l4_heading);
+  if (trim($term->l3_heading)) return trim($term->l3_heading);
+  if (trim($term->l2_heading)) return trim($term->l2_heading);
+  return trim($term->top_heading);
+}
+
+function nsmi_get_depth($term) {
+  if (trim($term->l4_heading)) return 3;
+  if (trim($term->l3_heading)) return 2;
+  if (trim($term->l2_heading)) return 1;
+  return 0;
+}
+
+function nsmi_taxonomy_import(&$import, $section = NULL) {
+  if ($import['vocabulary']) {
+    $vocabulary = (array)$import['vocabulary'];
+  }
+  else {
+    $vocabulary = array(
+     'vid' => NULL,
+     'name' => t('NSMI Vocabulary') .' (' . date('Y-m-d H:i') . ')',
+     'description' => t('NSMI-based customized vocabulary'),
+     'help' => t('NSMI cache to be used as source for local vocabulary based on NSMI.'),
+     'relations' => '0',
+     'hierarchy' => '1',
+     'multiple' => '1',
+     'required' => '0',
+     'tags' => '0',
+     'module' => 'taxonomy',
+     'weight' => '0',
+     // 'nodes' => 
+      // array (
+        // 'story' => 'story',
+        // 'page' => 'page',
+      // ),
+    );
+  }
+  
+  taxonomy_save_vocabulary($vocabulary);
+
+  drupal_set_message(t("Vocabulary '%name' !proc successfully.",
+    array(
+      '%name' => $vocabulary['name'],
+      '!proc' => $import['vocabulary'] ? 'updated' : 'created'
+    )
+  ));
+
+  if ($section) {
+    list($section, ) = explode('-', $section);
+    $top_headings = nsmi_get_nsmi_section($section);
+
+    $top_headings = implode("','", $top_headings);
+    $top_headings = "top_heading IN ('{$top_headings}')";
+  }
+  else {
+    $top_headings = '1';
+  }
+  
+  // Save the list to clean up later.
+  $result = db_query("SELECT tid FROM nsmi WHERE tid > 0 AND $top_headings");
+  while ($row = db_fetch_object($result)) {
+    $tids_before[$row->tid] = $row->tid;
+  }
+  
+  db_query("UPDATE nsmi SET tid = NULL WHERE $top_headings");
+  
+  // Parent map keeps track of existing TID hierarchy, allowing it to
+  // be recreated.
+  $parent_tid_map = array();
+
+  // Pass #1, create all the terms
+  foreach ($import['terms'] as $key => $term) {
+    $term_ref =& $import['terms'][$key];
+    $parent_tid_map[$term->tid] = $key;
+
+    $term_array = (array) $term;
+    $term_array['tid'] = $term->tid > 0 ? $term->tid : NULL;
+    $term_array['vid'] = $vocabulary['vid'];
+    //$term_array['parent'] = array(0 => 0);
+    
+    taxonomy_save_term($term_array);
+    nsmi_update_nsmi($term_array);
+    if (isset($tids_before[$term->tid])) {
+      unset($tids_before[$term->tid]);
+    }
+    
+    // Update the original $import structure with the new TID,
+    // VID, and parent attributes.
+    $term_ref->tid = $term_array['tid'];
+    $term_ref->vid = $term_array['vid'];
+
+    // taxonomy_get_tree() returns the hierarchy in a "parents" attribute
+    // while taxonomy_save_term() requires a "parent" attribute ...
+    $term_ref->parent = $import['terms'][$key]->parents;
+  }
+
+  // Pass #2, rebuild the term hierarchy
+  foreach ($import['terms'] as $key => $term) {
+    if ($term->parent[0] == 0) {
+      continue;
+    }
+
+    foreach ($term->parent as $pkey => $ptid) {
+      // The parent TIDs are still relative to the old imported TIDs, use
+      // the $parent_tid_map created earlier to lookup the new TID for this
+      // parent.
+      $term->parent[$pkey] = $import['terms'][$parent_tid_map[$ptid]]->tid;
+    }
+
+    $term_array = (array) $term;
+    
+    taxonomy_save_term($term_array);
+  }
+
+  // Clean up left over tids
+  if (!empty($tids_before)) {
+    foreach ($tids_before as $tid) {
+      taxonomy_del_term($tid);
+    }
+  }
+  
+  drupal_set_message(t("%num terms imported successfully.", array('%num' => count($parent_tid_map))));
+  
+  return $vocabulary['vid'];
+}
+
+function nsmi_update_nsmi(&$nsmi) {
+  db_query("UPDATE nsmi SET tid = %d WHERE pkey = %d", $nsmi['tid'], $nsmi['pkey']);
+}

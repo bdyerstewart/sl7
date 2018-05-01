@@ -1,0 +1,44 @@
+<?php
+
+/**
+ * @file
+ * Installation file for Tingwo module.
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function tingwo_requirements($phase) {
+  $requirements = array();
+  if ($phase == 'runtime') {
+    // Raise warning if Customer ID has not been set yet.
+    if (!is_string(variable_get('tingwo_customerid', '')) || drupal_strlen(variable_get('tingwo_customerid', ''))<1) {
+      $requirements['tingwo'] = array(
+        'title' => t('Tingwo module'),
+        'description' => t('Tingwo module has not been configured yet. Please configure its settings from the <a href="@url">Tingwo module settings page</a>.', array('@url' => url('admin/settings/tingwo'))),
+        'severity' => REQUIREMENT_ERROR,
+        'value' => t('Not configured'),
+      );
+    }
+  }
+  return $requirements;
+}
+
+/**
+ * Implements hook_install().
+ */
+function tingwo_install() {
+  variable_set('tingwo_customerid', '');
+  variable_set('tingwo_begin_weight', '-100');
+  variable_set('tingwo_end_weight', '100');
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function tingwo_uninstall() {
+  variable_del('tingwo_customerid');
+  variable_del('tingwo_begin_weight');
+  variable_del('tingwo_end_weight');
+}
+

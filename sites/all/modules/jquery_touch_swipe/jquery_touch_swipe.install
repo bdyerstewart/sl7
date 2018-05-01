@@ -1,0 +1,39 @@
+<?php
+
+/**
+ * @file
+ * Install file for the jquery_touch_swipe module.
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function jquery_touch_swipe_requirements($phase) {
+  $requirements = array();
+  $requirements['jquery_touch_swipe'] = array(
+    'title' => 'jquery_touch_swipe library',
+  );
+  if ($phase == 'runtime') {
+    $library = libraries_detect('jquery_touch_swipe');
+    if ($library['installed']) {
+      $requirements['jquery_touch_swipe']['value'] = $library['version'];
+      $requirements['jquery_touch_swipe']['severity'] = REQUIREMENT_OK;
+    }
+    else {
+      $requirements['jquery_touch_swipe']['value'] = $library['error'];
+      $requirements['jquery_touch_swipe']['description'] = $library['error message'];
+      $requirements['jquery_touch_swipe']['severity'] = REQUIREMENT_ERROR;
+    }
+  }
+  return $requirements;
+}
+
+
+/**
+ * Implements hook_uninstall().
+ */
+function jquery_touch_swipe_uninstall() {
+  variable_del('jquery_touch_swipe_select_pages');
+  variable_del('jquery_touch_swipe_flag_events');
+  variable_del('jquery_touch_swipe_flag_selector');
+}

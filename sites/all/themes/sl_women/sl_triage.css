@@ -1,0 +1,105 @@
+button, input[type="submit"], input[type="reset"], input[type="button"] {
+    background-color: #ccc;
+    box-shadow: 1px 1px 1px 1px #666;
+}
+.ta-nav-bar{
+  height: 30px;
+}
+.triage-restart {
+    background-color: rgb(86, 112, 172);
+    background-image: none;
+    border-radius: 5px;
+    color: rgb(255, 255, 255);
+    font-size: inherit;
+    height: 25px;
+    margin: 0 10px 0 0;
+    padding: 6px 0 0 6px;
+    text-indent: 0;
+    width: 100px;
+}
+.triage-restart a:link{
+    color: #fff;
+}
+.triage-restart2 {
+    background-color: rgb(86, 112, 172);
+    background-image: none;
+    border-radius: 5px;
+    color: rgb(255, 255, 255);
+    font-size: inherit;
+    height: 25px;
+    margin: 0 10px 0 0;
+    padding: 6px 0 0 6px;
+    text-indent: 0;
+    width: 100px;
+}
+.triage-restart2 a:link{
+    color: #fff;
+}
+.triage-restart2 a:visited{
+    color: #fff;
+}
+.ta-shadow-box{
+  border: 1px solid #999;
+  padding: 5px 10px;
+  box-shadow: 3px 3px 3px #888;    
+}
+.webform-container-inline label {
+  display: inherit;
+}
+.page-node-68030 .webform-component-radios{
+    border-bottom: 1px solid #666;
+}
+.triage-print-email {
+    display: block;
+    float: right;
+    padding-top: 14px;
+    width: 70%;
+}
+.ta-print-buttons input[type="submit"] {
+    padding: 0 10px 2px;
+}
+.triage-print-email .form-item label {
+    font-size: 13px;
+}
+#edit-triage-suggestion {
+    margin-left: 5px;
+    width: 180px;
+}
+#triage_suggestion_submit {
+    width: 70px;
+}
+.triage-step-text{
+    display: none;
+    float: left;
+}
+.triage-step-num{
+    float: left;
+}
+.triage-row {
+    margin: 10px 0;
+    width: 95%;
+}
+.triage-kids .triage-row {
+    line-height: 20px;
+}
+.page-triage #featured-image{
+    display: none;
+}
+.page-triage #main-content {
+     width: 100%;
+}
+#triage-page-wrapper{
+    margin-top: 65px;
+    padding: 20px 10px 10px;
+}
+#triage-page-wrapper .ta-help-panel{
+    margin-top: 0;
+}
+@media screen and (min-width: 760px) {
+    .ta-help-panel {
+        margin-top: -40px;
+    }   
+    .triage-step-text{
+        display: block;
+    }
+}

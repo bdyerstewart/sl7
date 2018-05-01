@@ -1,0 +1,22 @@
+/**
+ * Formatting for configuration
+ */
+.phiwarevoice-settings-left {
+  width: 49%;
+}
+.phiwarevoice-settings-right {
+  float: right;
+  width: 49%;
+}
+.phiwarevoice-settings-right fieldset {
+  margin-top: 0px;
+}
+.phiwarevoice-settings-bottom {
+  clear: both;
+}
+div#vox{
+    color: #777;
+}
+div#vox img{
+    vertical-align: middle;
+}

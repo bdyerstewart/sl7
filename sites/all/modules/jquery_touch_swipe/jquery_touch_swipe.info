@@ -1,0 +1,20 @@
+name = "Jquery Touch Swipe"
+description = "Makes the jquery touch swipe library available to drupal"
+core = 7.x
+package = "User Interface"
+configure = admin/config/user-interface/jquery-touch-swipe
+dependencies[] = libraries (>=2.x)
+
+; Information added by  packaging script on 2013-11-13
+version = "7.x-1.2 beta"
+core = "7.x"
+project = "jquery_touch_swipe"
+datestamp = "1384364310"
+
+
+; Information added by Drupal.org packaging script on 2015-01-28
+version = "7.x-1.4"
+core = "7.x"
+project = "jquery_touch_swipe"
+datestamp = "1422443053"
+

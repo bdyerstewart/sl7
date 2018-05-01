@@ -1,0 +1,12 @@
+name = "OG Menu Trail Breadcrumbs"
+description = "Builds breadcrumbs by combining a OG content's OG Menu with the group's menu."
+core = 7.x
+dependencies[] = og
+dependencies[] = og_menu
+
+; Information added by Drupal.org packaging script on 2015-05-20
+version = "7.x-1.0-rc1"
+core = "7.x"
+project = "og_menu_trail_breadcrumbs"
+datestamp = "1432157592"
+
